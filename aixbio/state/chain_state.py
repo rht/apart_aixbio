@@ -1,0 +1,43 @@
+from __future__ import annotations
+
+from typing import Annotated, TypedDict
+
+from aixbio.models.audit import AgentDecision
+from aixbio.models.dna import CassetteChain, DNAChain
+from aixbio.models.plasmid import PlasmidChain
+from aixbio.models.protein import Chain, ProteinRecord
+from aixbio.models.remediation import RemediationAction, RemediationPlan
+from aixbio.models.validation import ChainValidation, CheckResult
+from aixbio.state.pipeline_state import ChainProcessingResult, append_log
+
+
+class ChainSubgraphState(TypedDict):
+    # Context from outer graph
+    chain: Chain
+    host_organism: str
+    avoid_sites: tuple[str, ...]
+    tag_type: str
+    protease_site: str
+    vector: str
+    cloning_sites: tuple[str, ...]
+    protein_record: ProteinRecord
+
+    # Per-chain outputs (built up through the subgraph)
+    optimized_dna: DNAChain | None
+    cassette: CassetteChain | None
+    plasmid: PlasmidChain | None
+    chain_validation: ChainValidation | None
+
+    # Remediation control
+    remediation_attempt: int
+    max_remediation_attempts: int
+    failed_checks: tuple[CheckResult, ...]
+    remediation_plan: RemediationPlan | None
+    remediation_history: Annotated[list[RemediationAction], append_log]
+
+    # Output for outer graph
+    chain_results: Annotated[list[ChainProcessingResult], append_log]
+
+    # Auditability
+    decision_log: Annotated[list[AgentDecision], append_log]
+    warnings: Annotated[list[str], append_log]
