@@ -1,32 +1,35 @@
 from __future__ import annotations
 
-import asyncio
 import json
+import logging
 from datetime import datetime, timezone
 
 from langchain_core.messages import HumanMessage, SystemMessage
-from langchain_openai import ChatOpenAI
 
-from aixbio.config import LLM_MODEL, OPENROUTER_API_KEY, OPENROUTER_BASE_URL
+from aixbio.config import LLM_MAX_TOKENS, LLM_MODEL, OPENROUTER_API_KEY, OPENROUTER_BASE_URL, ChatOpenRouter
 from aixbio.models.audit import AgentDecision
 from aixbio.models.protein import Chain, ProteinRecord
 from aixbio.prompts.sequence_retrieval import SEQUENCE_RETRIEVAL_SYSTEM
 from aixbio.state.pipeline_state import PipelineState
-from aixbio.tools.uniprot import extract_protein_name, extract_sequence, fetch_uniprot_entry
+from aixbio.tools.uniprot import extract_protein_name, extract_sequence, fetch_uniprot_entry_sync
+
+logger = logging.getLogger(__name__)
 
 
 def sequence_retrieval_agent(state: PipelineState) -> dict:
     compound_id = state["compound_id"]
 
-    entry = asyncio.run(fetch_uniprot_entry(compound_id))
+    # Use sync wrapper to avoid asyncio.run() nesting issues (Issue #15)
+    entry = fetch_uniprot_entry_sync(compound_id)
     full_sequence = extract_sequence(entry)
     protein_name = extract_protein_name(entry)
 
     features_summary = json.dumps(entry.get("features", []), indent=2, default=str)
 
-    llm = ChatOpenAI(
+    llm = ChatOpenRouter(
         model=LLM_MODEL,
         temperature=0,
+        max_tokens=LLM_MAX_TOKENS,
         openai_api_key=OPENROUTER_API_KEY,
         openai_api_base=OPENROUTER_BASE_URL,
     )
@@ -50,6 +53,11 @@ def sequence_retrieval_agent(state: PipelineState) -> dict:
         json_end = response_text.rindex("}") + 1
         parsed = json.loads(response_text[json_start:json_end])
     except (ValueError, json.JSONDecodeError):
+        logger.warning(
+            f"FALLBACK ACTIVATED for {compound_id}: LLM response could not be parsed. "
+            f"Using full precursor sequence ({len(full_sequence)} aa). This may include "
+            f"signal peptides and pro-domains that should NOT be expressed."
+        )
         parsed = _fallback_single_chain(compound_id, protein_name, full_sequence)
 
     chains = tuple(
@@ -94,5 +102,10 @@ def _fallback_single_chain(
             "aa_sequence": sequence,
             "length": len(sequence),
         }],
-        "reasoning": "Fallback: LLM response parsing failed, using full sequence.",
+        "reasoning": (
+            "FALLBACK: LLM response parsing failed. Using full precursor sequence. "
+            "WARNING: This may include signal peptides and pro-domains. "
+            "The resulting protein may not fold correctly in E. coli."
+        ),
+        "fallback_used": True,
     }

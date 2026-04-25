@@ -16,6 +16,12 @@ def merge_chain_validations(
 
 
 def append_log(existing: list, new: list) -> list:
+    """Reducer for LangGraph Annotated fields.
+
+    Each node returns only *its own* new items (e.g. remediation actions from
+    this round). The reducer automatically accumulates them by concatenation.
+    This means nodes should NOT return the full history — just the delta.
+    """
     return existing + new
 
 
@@ -29,6 +35,8 @@ class ChainProcessingResult(TypedDict):
     checks: tuple[CheckResult, ...]
     remediation_rounds: int
     remediation_history: tuple[RemediationAction, ...]
+    # Status distinguishes pass, fail, and max-retries-exceeded outcomes
+    status: Literal["passed", "failed", "max_retries_exceeded"]
 
 
 class PipelineState(TypedDict):

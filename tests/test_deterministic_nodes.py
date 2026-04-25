@@ -68,7 +68,7 @@ def test_cassette_assembly():
     assert cassette.id == "Insulin_B"
     assert cassette.full_dna.startswith("ATG")
     assert cassette.full_dna.endswith("TAATAA")
-    assert cassette.elements.tag == "CACCACCACCACCACCAC"
+    assert cassette.elements.tag == "CACCACCACCACCACCACC"  # 6×His = CAC×6 = 18 nt
     assert opt_result["optimized_dna"].dna_sequence in cassette.full_dna
 
 
@@ -94,6 +94,12 @@ def test_sequence_validation():
     state = _make_chain_state()
     opt_result = codon_optimization(state)
     state = _make_chain_state(optimized_dna=opt_result["optimized_dna"])
+    # Build cassette so validation checks the full construct (Issue #2)
+    cas_result = cassette_assembly(state)
+    state = _make_chain_state(
+        optimized_dna=opt_result["optimized_dna"],
+        cassette=cas_result["cassette"],
+    )
     result = sequence_validation(state)
     validation = result["chain_validation"]
 

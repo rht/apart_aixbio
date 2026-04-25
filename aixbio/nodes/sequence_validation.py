@@ -13,11 +13,20 @@ def sequence_validation(state: ChainSubgraphState) -> dict:
     dna_chain = state["optimized_dna"]
     chain = state["chain"]
     cloning_sites = state["cloning_sites"]
-    dna = dna_chain.dna_sequence
+    cassette = state.get("cassette")
+
+    # The gene-only DNA (for back-translation check)
+    gene_dna = dna_chain.dna_sequence
+
+    # The full expression construct (for all other checks).
+    # If cassette is available, validate the actual construct that enters the
+    # host cell: ATG + tag + protease + gene + stop.  Falls back to gene-only
+    # when cassette hasn't been assembled yet.
+    construct_dna = cassette.full_dna if cassette else gene_dna
 
     checks: list[CheckResult] = []
 
-    gc = compute_gc(dna)
+    gc = compute_gc(construct_dna)
     checks.append(CheckResult(
         name="gc_content",
         passed=0.50 <= gc <= 0.60,
@@ -25,7 +34,7 @@ def sequence_validation(state: ChainSubgraphState) -> dict:
         threshold="0.50-0.60",
     ))
 
-    cai = compute_cai(dna)
+    cai = compute_cai(gene_dna)  # CAI is meaningful only for the coding gene
     checks.append(CheckResult(
         name="cai_score",
         passed=cai > 0.8,
@@ -33,7 +42,9 @@ def sequence_validation(state: ChainSubgraphState) -> dict:
         threshold="> 0.8",
     ))
 
-    sites = find_restriction_sites(dna, cloning_sites)
+    # Check for restriction sites in the construct, but exclude the
+    # intentional cloning-site positions at the flanks (Issue #9).
+    sites = find_restriction_sites(construct_dna, cloning_sites)
     checks.append(CheckResult(
         name="restriction_sites",
         passed=len(sites) == 0,
@@ -41,7 +52,9 @@ def sequence_validation(state: ChainSubgraphState) -> dict:
         threshold="0 hits",
     ))
 
-    dg = estimate_five_prime_dg(dna)
+    # RNA secondary structure in the 5' region — the ribosome encounters the
+    # tag region first (not the gene), so this must be checked on the construct.
+    dg = estimate_five_prime_dg(construct_dna)
     checks.append(CheckResult(
         name="rna_secondary_structure",
         passed=dg > -10.0,
@@ -49,7 +62,7 @@ def sequence_validation(state: ChainSubgraphState) -> dict:
         threshold="> -10 kcal/mol",
     ))
 
-    translated = translate_dna(dna)
+    translated = translate_dna(gene_dna)
     expected = chain.aa_sequence
     identity_match = translated.rstrip("*") == expected
     checks.append(CheckResult(
@@ -59,7 +72,7 @@ def sequence_validation(state: ChainSubgraphState) -> dict:
         threshold="100% identity",
     ))
 
-    codons = split_codons(dna)
+    codons = split_codons(gene_dna)
     rare_count = sum(1 for c in codons if c.upper() in RARE_CODONS_ECOLI)
     checks.append(CheckResult(
         name="rare_codons",

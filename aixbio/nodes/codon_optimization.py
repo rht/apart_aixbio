@@ -21,13 +21,23 @@ def codon_optimization(state: ChainSubgraphState) -> dict:
             break
         for enzyme, pos in hits:
             site_len = len(ENZYME_SITES[enzyme])
+            site_seq = ENZYME_SITES[enzyme]
             codon_start = pos // 3
             codon_end = (pos + site_len - 1) // 3 + 1
+            site_removed = False
             for ci in range(codon_start, min(codon_end, len(codons))):
+                original_codon = codons[ci]
                 alts = synonymous_alternatives(codons[ci])
-                if alts:
-                    codons[ci] = alts[0]
+                for alt in alts:
+                    codons[ci] = alt
+                    test_dna = "".join(codons)
+                    # Check if this substitution eliminated the specific site
+                    if site_seq not in test_dna[max(0, pos - site_len):pos + site_len * 2]:
+                        site_removed = True
+                        break
+                if site_removed:
                     break
+                codons[ci] = original_codon  # revert if no alt worked
         dna = "".join(codons)
 
     cai_score = compute_cai(dna)

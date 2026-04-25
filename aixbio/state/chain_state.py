@@ -33,6 +33,9 @@ class ChainSubgraphState(TypedDict):
     max_remediation_attempts: int
     failed_checks: tuple[CheckResult, ...]
     remediation_plan: RemediationPlan | None
+    # Remediation history uses append_log reducer: each `apply_fixes` call
+    # returns only *this round's* actions, and the reducer accumulates them.
+    # Node code should NOT return the full history — just the new delta.
     remediation_history: Annotated[list[RemediationAction], append_log]
 
     # Output for outer graph

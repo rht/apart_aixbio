@@ -40,7 +40,8 @@ AA_TO_CODONS: dict[str, list[str]] = {}
 for _codon, _aa in CODON_TO_AA.items():
     AA_TO_CODONS.setdefault(_aa, []).append(_codon)
 
-RARE_CODONS_ECOLI = frozenset({"AGG", "AGA", "CGA", "CUA", "AUA", "CCC"})
+# NOTE: These must be DNA codons (T not U). CUA→CTA, AUA→ATA.
+RARE_CODONS_ECOLI = frozenset({"AGG", "AGA", "CGA", "CTA", "ATA", "CCC"})
 
 
 def translate_codon(codon: str) -> str:
@@ -48,8 +49,13 @@ def translate_codon(codon: str) -> str:
 
 
 def translate_dna(dna: str) -> str:
+    if len(dna) % 3 != 0:
+        raise ValueError(
+            f"DNA length {len(dna)} is not divisible by 3 — possible frameshift. "
+            f"Trailing nucleotides: {dna[-(len(dna) % 3):]!r}"
+        )
     codons = [dna[i:i+3] for i in range(0, len(dna), 3)]
-    return "".join(translate_codon(c) for c in codons if len(c) == 3)
+    return "".join(translate_codon(c) for c in codons)
 
 
 def best_ecoli_codon(aa: str) -> str:
