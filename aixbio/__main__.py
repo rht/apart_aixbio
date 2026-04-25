@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from pathlib import Path
 
 from dotenv import load_dotenv
 
@@ -27,6 +28,7 @@ def main():
     parser.add_argument("--structural", action="store_true", help="Run structural validation (Step 6)")
     parser.add_argument("--max-retries", type=int, default=DEFAULT_MAX_REMEDIATION_ATTEMPTS)
     parser.add_argument("--auto-approve", action="store_true", help="Skip human checkpoints")
+    parser.add_argument("--output-dir", default="output", help="Directory for output files")
     args = parser.parse_args()
 
     app = compile_pipeline()
@@ -80,6 +82,7 @@ def main():
             break
 
     _print_results(result)
+    _write_artifacts(result, args.compound_id, args.output_dir)
     return 0
 
 
@@ -134,6 +137,63 @@ def _print_results(result: dict):
         for d in decisions:
             print(f"  [{d.node}] {d.action}")
             print(f"    Reasoning: {d.reasoning}")
+
+
+def _write_artifacts(result: dict, compound_id: str, output_dir: str):
+    out = Path(output_dir)
+    out.mkdir(parents=True, exist_ok=True)
+
+    chain_results = result.get("chain_results", [])
+    if not chain_results:
+        return
+
+    for cr in chain_results:
+        chain_id = cr["chain_id"]
+        safe_id = chain_id.replace(" ", "_").replace("/", "_")
+
+        if cr.get("optimized_dna_sequence"):
+            fasta_path = out / f"{safe_id}.fasta"
+            fasta_path.write_text(
+                f">{chain_id} optimized for E. coli\n{cr['optimized_dna_sequence']}\n"
+            )
+            print(f"  Wrote {fasta_path}")
+
+        if cr.get("genbank_file"):
+            gb_path = out / f"{safe_id}_plasmid.gb"
+            gb_path.write_text(cr["genbank_file"])
+            print(f"  Wrote {gb_path}")
+
+    summary = {
+        "compound_id": compound_id,
+        "status": result.get("pipeline_status", "unknown"),
+        "warnings": result.get("warnings", []),
+        "chains": [
+            {
+                "chain_id": cr["chain_id"],
+                "insert_size": cr["insert_size"],
+                "validation_passed": cr["validation_passed"],
+                "remediation_rounds": cr["remediation_rounds"],
+                "status": cr["status"],
+                "checks": [
+                    {"name": c.name, "passed": c.passed, "value": c.value, "threshold": c.threshold}
+                    for c in cr.get("checks", ())
+                ],
+            }
+            for cr in chain_results
+        ],
+    }
+    if result.get("protein_record"):
+        pr = result["protein_record"]
+        summary["protein"] = {
+            "name": pr.name,
+            "uniprot_id": pr.uniprot_id,
+            "chains": [{"id": c.id, "length": c.length} for c in pr.chains],
+        }
+
+    json_path = out / f"{compound_id}_summary.json"
+    json_path.write_text(json.dumps(summary, indent=2, default=str))
+    print(f"  Wrote {json_path}")
+    print(f"\nAll artifacts written to {out}/")
 
 
 if __name__ == "__main__":

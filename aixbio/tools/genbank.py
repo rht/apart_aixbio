@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import logging
+import os
 from io import StringIO
+from pathlib import Path
 
 from Bio.Seq import Seq
 from Bio.SeqFeature import FeatureLocation, SeqFeature
@@ -9,13 +11,8 @@ from Bio.SeqRecord import SeqRecord
 
 logger = logging.getLogger(__name__)
 
-# pET-28a(+) backbone: 5369 bp.
-# NOTE: The actual backbone sequence is not embedded due to licensing.
-# The backbone is represented as N's with annotated functional elements
-# at their approximate positions within the vector.
 PET28A_BACKBONE_SIZE = 5369
 
-# Approximate feature positions within pET-28a(+) (from SnapGene/Addgene maps)
 _PET28A_FEATURES = [
     ("regulatory", 370, 386, {"note": ["T7 promoter"], "regulatory_class": ["promoter"]}),
     ("regulatory", 386, 404, {"note": ["lac operator"]}),
@@ -26,6 +23,43 @@ _PET28A_FEATURES = [
     ("terminator", 450, 497, {"note": ["T7 terminator"]}),
 ]
 
+_BACKBONE_SEARCH_PATHS = [
+    Path(__file__).parent.parent / "data" / "pET-28a.fasta",
+    Path(__file__).parent.parent / "data" / "pET-28a.fa",
+    Path(__file__).parent.parent / "data" / "pET-28a.gb",
+]
+
+_cached_backbone: str | None = None
+
+
+def _load_backbone() -> str | None:
+    global _cached_backbone
+    if _cached_backbone is not None:
+        return _cached_backbone
+
+    env_path = os.getenv("PET28A_BACKBONE_PATH")
+    search = [Path(env_path)] + _BACKBONE_SEARCH_PATHS if env_path else _BACKBONE_SEARCH_PATHS
+
+    for path in search:
+        if not path.exists():
+            continue
+        text = path.read_text()
+        if path.suffix in (".fasta", ".fa"):
+            lines = [l.strip() for l in text.splitlines() if l.strip() and not l.startswith(">")]
+            seq = "".join(lines).upper()
+        elif path.suffix == ".gb":
+            from Bio import SeqIO
+            record = SeqIO.read(StringIO(text), "genbank")
+            seq = str(record.seq).upper()
+        else:
+            continue
+        if len(seq) > 0:
+            logger.info(f"Loaded pET-28a(+) backbone from {path} ({len(seq)} bp)")
+            _cached_backbone = seq
+            return seq
+
+    return None
+
 
 def build_plasmid_record(
     chain_id: str,
@@ -34,41 +68,46 @@ def build_plasmid_record(
     cloning_sites: tuple[str, ...] = ("BamHI", "XhoI"),
 ) -> tuple[str, int]:
     insert_size = len(cassette_dna)
-    total_size = PET28A_BACKBONE_SIZE + insert_size
 
-    logger.warning(
-        "GenBank backbone uses placeholder N's (not the real pET-28a(+) sequence). "
-        "The output file is structurally valid but cannot be used for synthesis "
-        "without replacing the backbone with the actual vector sequence."
-    )
+    backbone_seq = _load_backbone()
+    if backbone_seq:
+        backbone_size = len(backbone_seq)
+        plasmid_seq = backbone_seq + cassette_dna
+        description_note = ""
+    else:
+        backbone_size = PET28A_BACKBONE_SIZE
+        logger.warning(
+            "No pET-28a(+) backbone file found. Using placeholder N's. "
+            "Place the real sequence at data/pET-28a.fasta or set PET28A_BACKBONE_PATH."
+        )
+        plasmid_seq = "N" * backbone_size + cassette_dna
+        description_note = " (WARNING: backbone is placeholder N's)"
 
-    plasmid_seq = "N" * PET28A_BACKBONE_SIZE + cassette_dna
+    total_size = backbone_size + insert_size
     record = SeqRecord(
         Seq(plasmid_seq),
         id=f"{vector}_{chain_id}",
         name=f"{vector}_{chain_id}",
-        description=f"{vector} with {chain_id} insert (WARNING: backbone is placeholder N's)",
+        description=f"{vector} with {chain_id} insert{description_note}",
         annotations={"molecule_type": "DNA", "topology": "circular"},
     )
 
-    # Annotate known functional elements on the backbone
     for feat_type, start, end, qualifiers in _PET28A_FEATURES:
-        record.features.append(SeqFeature(
-            FeatureLocation(start, end),
-            type=feat_type,
-            qualifiers=qualifiers,
-        ))
+        if start < backbone_size:
+            record.features.append(SeqFeature(
+                FeatureLocation(start, min(end, backbone_size)),
+                type=feat_type,
+                qualifiers=qualifiers,
+            ))
 
-    # Backbone source region
     record.features.append(SeqFeature(
-        FeatureLocation(0, PET28A_BACKBONE_SIZE),
+        FeatureLocation(0, backbone_size),
         type="source",
-        qualifiers={"note": [f"{vector} backbone (placeholder — replace with actual sequence)"]},
+        qualifiers={"note": [f"{vector} backbone"]},
     ))
 
-    # Insert CDS
     record.features.append(SeqFeature(
-        FeatureLocation(PET28A_BACKBONE_SIZE, total_size),
+        FeatureLocation(backbone_size, total_size),
         type="CDS",
         qualifiers={
             "gene": [chain_id],

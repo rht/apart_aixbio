@@ -1,81 +1,54 @@
 from __future__ import annotations
 
-import json
+import logging
 from datetime import datetime, timezone
 
-from langchain_core.messages import HumanMessage, SystemMessage
-
-from aixbio.config import LLM_MAX_TOKENS, LLM_MODEL, OPENROUTER_API_KEY, OPENROUTER_BASE_URL, ChatOpenRouter
 from aixbio.models.audit import AgentDecision
+from aixbio.models.dna import DNAChain
 from aixbio.models.remediation import PlannedFix, RemediationAction, RemediationPlan
-from aixbio.prompts.remediation import REMEDIATION_SYSTEM
 from aixbio.state.chain_state import ChainSubgraphState
-from aixbio.tools.codon_tables import split_codons, translate_codon
+from aixbio.tools.cai import compute_cai
+from aixbio.tools.codon_tables import (
+    RARE_CODONS_ECOLI,
+    best_ecoli_codon,
+    get_ecoli_table,
+    split_codons,
+    synonymous_alternatives,
+    translate_codon,
+)
+from aixbio.tools.gc import compute_gc
+from aixbio.tools.restriction_sites import ENZYME_SITES, find_restriction_sites
+
+logger = logging.getLogger(__name__)
 
 
 def remediation_agent(state: ChainSubgraphState) -> dict:
     dna_chain = state["optimized_dna"]
     failed_checks = state["failed_checks"]
-    history = state.get("remediation_history", [])
     attempt = state["remediation_attempt"]
 
     codons = split_codons(dna_chain.dna_sequence)
-    codons_display = " ".join(f"{i}:{c}" for i, c in enumerate(codons))
+    all_fixes: list[PlannedFix] = []
+    check_names = {c.name for c in failed_checks}
 
-    failed_summary = json.dumps([
-        {"name": c.name, "value": str(c.value), "threshold": c.threshold}
-        for c in failed_checks
-    ], indent=2)
+    if "restriction_sites" in check_names:
+        all_fixes.extend(_plan_restriction_site_fixes(codons, state["avoid_sites"]))
 
-    history_summary = ""
-    if history:
-        history_summary = "\nPrevious fix attempts:\n" + json.dumps([
-            {"check": h.check_name, "positions": h.positions_affected, "from": h.codons_before, "to": h.codons_after}
-            for h in history
-        ], indent=2, default=str)
+    if "rare_codons" in check_names:
+        all_fixes.extend(_plan_rare_codon_fixes(codons))
 
-    llm = ChatOpenRouter(
-        model=LLM_MODEL,
-        temperature=0,
-        max_tokens=LLM_MAX_TOKENS,
-        openai_api_key=OPENROUTER_API_KEY,
-        openai_api_base=OPENROUTER_BASE_URL,
-    )
-    response = llm.invoke([
-        SystemMessage(content=REMEDIATION_SYSTEM),
-        HumanMessage(content=(
-            f"Chain: {dna_chain.id}\n"
-            f"Attempt: {attempt + 1}\n"
-            f"DNA codons ({len(codons)} total):\n{codons_display}\n\n"
-            f"Failed checks:\n{failed_summary}\n"
-            f"{history_summary}\n\n"
-            "Produce targeted fixes."
-        )),
-    ])
+    if "cai_score" in check_names:
+        all_fixes.extend(_plan_cai_fixes(codons))
 
-    response_text = response.content
-    if isinstance(response_text, list):
-        response_text = response_text[0].get("text", "") if response_text else ""
-
-    try:
-        json_start = response_text.index("{")
-        json_end = response_text.rindex("}") + 1
-        parsed = json.loads(response_text[json_start:json_end])
-    except (ValueError, json.JSONDecodeError):
-        parsed = {"actions": [], "reasoning": "Failed to parse LLM response", "priority_order": []}
+    if "gc_content" in check_names:
+        gc_check = next(c for c in failed_checks if c.name == "gc_content")
+        gc_val = float(gc_check.value)
+        all_fixes.extend(_plan_gc_fixes(codons, gc_val))
 
     plan = RemediationPlan(
-        actions=tuple(
-            PlannedFix(
-                check_name=a["check_name"],
-                strategy=a.get("strategy", "unknown"),
-                target_positions=tuple(a["target_positions"]),
-                replacement_codons=tuple(a["replacement_codons"]),
-            )
-            for a in parsed.get("actions", [])
-        ),
-        reasoning=parsed.get("reasoning", ""),
-        priority_order=tuple(parsed.get("priority_order", [])),
+        actions=tuple(all_fixes),
+        reasoning=f"Deterministic fixes for: {', '.join(sorted(check_names))}",
+        priority_order=tuple(sorted(check_names)),
     )
 
     decision = AgentDecision(
@@ -84,7 +57,7 @@ def remediation_agent(state: ChainSubgraphState) -> dict:
         action=f"Planned {len(plan.actions)} fixes for {len(failed_checks)} failed checks",
         timestamp=datetime.now(timezone.utc).isoformat(),
         input_summary=f"Chain {dna_chain.id}, attempt {attempt + 1}, {len(failed_checks)} failures",
-        output_summary=f"Fixes: {', '.join(a.check_name for a in plan.actions)}",
+        output_summary=f"Fixes: {', '.join(a.check_name for a in plan.actions)}" if plan.actions else "No fixes available",
     )
 
     return {
@@ -93,11 +66,123 @@ def remediation_agent(state: ChainSubgraphState) -> dict:
     }
 
 
-def apply_fixes(state: ChainSubgraphState) -> dict:
-    from aixbio.models.dna import DNAChain
-    from aixbio.tools.cai import compute_cai
-    from aixbio.tools.gc import compute_gc
+def _plan_restriction_site_fixes(
+    codons: list[str], avoid_sites: tuple[str, ...]
+) -> list[PlannedFix]:
+    dna = "".join(codons)
+    hits = find_restriction_sites(dna, avoid_sites)
+    fixes = []
+    for enzyme, pos in hits:
+        site_seq = ENZYME_SITES[enzyme]
+        site_len = len(site_seq)
+        codon_start = pos // 3
+        codon_end = (pos + site_len - 1) // 3 + 1
+        fixed = False
+        for ci in range(codon_start, min(codon_end, len(codons))):
+            for alt in synonymous_alternatives(codons[ci]):
+                old = codons[ci]
+                codons[ci] = alt
+                if site_seq not in "".join(codons):
+                    fixes.append(PlannedFix(
+                        check_name="restriction_sites",
+                        strategy="synonymous_codon_swap",
+                        target_positions=(ci,),
+                        replacement_codons=(alt,),
+                    ))
+                    fixed = True
+                    break
+                codons[ci] = old
+            if fixed:
+                break
+    return fixes
 
+
+def _plan_rare_codon_fixes(codons: list[str]) -> list[PlannedFix]:
+    fixes = []
+    for i, codon in enumerate(codons):
+        if codon.upper() in RARE_CODONS_ECOLI:
+            best = best_ecoli_codon(translate_codon(codon))
+            if best != codon.upper():
+                fixes.append(PlannedFix(
+                    check_name="rare_codons",
+                    strategy="replace_rare_with_optimal",
+                    target_positions=(i,),
+                    replacement_codons=(best,),
+                ))
+                codons[i] = best
+    return fixes
+
+
+def _plan_cai_fixes(codons: list[str]) -> list[PlannedFix]:
+    table = get_ecoli_table()
+    scored = []
+    for i, codon in enumerate(codons):
+        aa = translate_codon(codon)
+        if aa == "*":
+            continue
+        best = best_ecoli_codon(aa)
+        if best == codon.upper():
+            continue
+        aa_codons = table.get(aa, {})
+        max_freq = max(aa_codons.values()) if aa_codons else 1.0
+        codon_freq = aa_codons.get(codon.upper(), 0.0)
+        relative = codon_freq / max_freq if max_freq > 0 else 0.0
+        if relative < 0.5:
+            scored.append((i, best, relative))
+
+    scored.sort(key=lambda x: x[2])
+    fixes = []
+    for i, best, _ in scored:
+        fixes.append(PlannedFix(
+            check_name="cai_score",
+            strategy="replace_suboptimal_codon",
+            target_positions=(i,),
+            replacement_codons=(best,),
+        ))
+        codons[i] = best
+    return fixes
+
+
+def _plan_gc_fixes(codons: list[str], current_gc: float) -> list[PlannedFix]:
+    need_higher = current_gc < 0.50
+    fixes = []
+
+    candidates = []
+    for i, codon in enumerate(codons):
+        aa = translate_codon(codon)
+        if aa == "*":
+            continue
+        alts = synonymous_alternatives(codon)
+        if not alts:
+            continue
+        codon_gc = compute_gc(codon)
+        if need_higher:
+            best_alt = max(alts, key=lambda c: compute_gc(c))
+            improvement = compute_gc(best_alt) - codon_gc
+        else:
+            best_alt = min(alts, key=lambda c: compute_gc(c))
+            improvement = codon_gc - compute_gc(best_alt)
+        if improvement > 0:
+            candidates.append((i, best_alt, improvement))
+
+    candidates.sort(key=lambda x: -x[2])
+
+    for i, alt, _ in candidates:
+        fixes.append(PlannedFix(
+            check_name="gc_content",
+            strategy="increase_gc" if need_higher else "decrease_gc",
+            target_positions=(i,),
+            replacement_codons=(alt,),
+        ))
+        codons[i] = alt
+        new_gc = compute_gc("".join(codons))
+        if 0.50 <= new_gc <= 0.60:
+            break
+
+    return fixes
+
+
+def apply_fixes(state: ChainSubgraphState) -> dict:
     dna_chain = state["optimized_dna"]
     plan = state["remediation_plan"]
     codons = split_codons(dna_chain.dna_sequence)

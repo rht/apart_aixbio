@@ -9,7 +9,7 @@ from aixbio.state.chain_state import ChainSubgraphState
 
 TAG_SEQUENCES = {
     # 6×His = CAC×6 = 18 nt (encodes HHHHHH)
-    "6xHis": "CACCACCACCACCACCACC",
+    "6xHis": "CACCACCACCACCACCAC",
 }
 
 PROTEASE_SITE_SEQUENCES = {

@@ -10,7 +10,7 @@ from aixbio.state.pipeline_state import PipelineState
 
 def validation_router(
     state: ChainSubgraphState,
-) -> Literal["package_result", "halt_pipeline", "remediation_agent"]:
+) -> Literal["package_result", "halt_pipeline", "package_result_failed", "remediation_agent"]:
     validation = state["chain_validation"]
     if validation is None:
         return "halt_pipeline"
@@ -19,6 +19,8 @@ def validation_router(
     for check in validation.checks:
         if check.name == "back_translation" and not check.passed:
             return "halt_pipeline"
+    if state["remediation_attempt"] >= state["max_remediation_attempts"]:
+        return "package_result_failed"
     return "remediation_agent"
 
 

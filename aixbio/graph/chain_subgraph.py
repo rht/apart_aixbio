@@ -48,6 +48,7 @@ def build_chain_subgraph() -> StateGraph:
         {
             "package_result": "package_result",
             "halt_pipeline": "halt_pipeline",
+            "package_result_failed": "package_result_failed",
             "remediation_agent": "remediation_agent",
         },
     )

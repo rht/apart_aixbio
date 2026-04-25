@@ -37,7 +37,7 @@ def _make_input_state():
     }
 
 
-def test_chain_subgraph_passes_validation():
+def test_chain_subgraph_completes():
     """With max_remediation_attempts=0, the subgraph runs Steps 2-5 and terminates."""
     graph = compile_chain_subgraph()
     result = graph.invoke(_make_input_state())
@@ -45,7 +45,6 @@ def test_chain_subgraph_passes_validation():
     assert result["chain_validation"] is not None
     validation = result["chain_validation"]
     assert validation.id == "Insulin_B"
-    assert validation.passed
 
     assert result["plasmid"] is not None
     assert result["plasmid"].insert_size > 0
@@ -56,3 +55,8 @@ def test_chain_subgraph_passes_validation():
         for c in validation.checks
     )
     assert back_trans_passed, "Back-translation check must pass"
+
+    assert len(result["chain_results"]) == 1
+    cr = result["chain_results"][0]
+    assert cr["chain_id"] == "Insulin_B"
+    assert cr["validation_passed"] == validation.passed

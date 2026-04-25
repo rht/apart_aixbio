@@ -78,7 +78,13 @@ def fetch_uniprot_entry_sync(uniprot_id: str) -> dict[str, Any]:
 
 
 def extract_sequence(entry: dict[str, Any]) -> str:
-    return entry["sequence"]["value"]
+    seq = entry.get("sequence")
+    if seq is None or "value" not in seq:
+        raise ValueError(
+            f"UniProt entry has no sequence data. "
+            f"Available keys: {sorted(entry.keys())}"
+        )
+    return seq["value"]
 
 
 def extract_features(entry: dict[str, Any], feature_type: str) -> list[dict[str, Any]]:
@@ -97,3 +103,70 @@ def extract_protein_name(entry: dict[str, Any]) -> str:
     if sub_names:
         return sub_names[0].get("fullName", {}).get("value", "Unknown")
     return "Unknown"
+
+
+def extract_mature_chains(entry: dict[str, Any], compound_id: str) -> tuple[list[dict], str]:
+    """Deterministically extract mature chain(s) from UniProt feature annotations.
+
+    Returns (chains_list, reasoning_string).
+
+    Priority:
+    1. If "Chain" features exist, use them (multi-chain or annotated proteins)
+    2. Otherwise, strip signal peptide and use the remaining sequence
+    """
+    import re
+
+    full_sequence = extract_sequence(entry)
+    protein_name = extract_protein_name(entry)
+
+    chain_features = extract_features(entry, "Chain")
+
+    if chain_features:
+        chains = []
+        for feat in chain_features:
+            loc = feat.get("location", {})
+            start = loc.get("start", {}).get("value", 1) - 1
+            end = loc.get("end", {}).get("value", len(full_sequence))
+            aa_seq = full_sequence[start:end]
+            desc = feat.get("description", "")
+            clean = re.sub(r"[^a-zA-Z0-9 ]", "", desc).strip().replace(" ", "_")
+            chain_id = clean or f"chain_{len(chains) + 1}"
+            chains.append({
+                "id": chain_id,
+                "aa_sequence": aa_seq,
+                "length": len(aa_seq),
+            })
+        reasoning = (
+            f"Extracted {len(chains)} chain(s) from UniProt 'Chain' feature annotations "
+            f"for {protein_name} ({compound_id})."
+        )
+        return chains, reasoning
+
+    signal_features = extract_features(entry, "Signal")
+    transit_features = extract_features(entry, "Transit peptide")
+    mature_start = 0
+    for feat in signal_features + transit_features:
+        loc = feat.get("location", {})
+        end = loc.get("end", {}).get("value", 0)
+        mature_start = max(mature_start, end)
+
+    aa_seq = full_sequence[mature_start:]
+    clean = re.sub(r"[^a-zA-Z0-9 ]", "", protein_name).strip().replace(" ", "_")
+    chain_id = f"{clean}_{compound_id}" if clean else compound_id
+
+    reasoning = (
+        f"Single-chain protein {protein_name} ({compound_id}). "
+        f"Stripped {mature_start} residue signal/transit peptide. "
+        f"Mature sequence: {len(aa_seq)} aa."
+    )
+    if mature_start == 0:
+        reasoning = (
+            f"Single-chain protein {protein_name} ({compound_id}). "
+            f"No signal peptide annotated. Using full sequence: {len(aa_seq)} aa."
+        )
+
+    return [{
+        "id": chain_id,
+        "aa_sequence": aa_seq,
+        "length": len(aa_seq),
+    }], reasoning

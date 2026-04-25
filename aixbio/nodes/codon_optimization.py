@@ -32,7 +32,7 @@ def codon_optimization(state: ChainSubgraphState) -> dict:
                     codons[ci] = alt
                     test_dna = "".join(codons)
                     # Check if this substitution eliminated the specific site
-                    if site_seq not in test_dna[max(0, pos - site_len):pos + site_len * 2]:
+                    if site_seq not in test_dna[max(0, pos - site_len):pos + site_len]:
                         site_removed = True
                         break
                 if site_removed:
