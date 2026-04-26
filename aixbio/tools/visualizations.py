@@ -330,6 +330,45 @@ def _panel_overview(ax: plt.Axes, summary: dict) -> None:
     ax.legend(handles=handles, loc="lower right", fontsize=6)
 
 
+
+# ── Panel E: Validation Fitness Radar ──────────────────────────
+
+def _panel_radar(ax: plt.Axes, summary: dict) -> None:
+    from math import pi
+    chains = summary.get("chains", [])
+    if not chains:
+        ax.set_visible(False)
+        return
+        
+    ch = chains[0]
+    cks = {c["name"]: c["value"] for c in ch.get("checks", [])}
+    
+    cai = cks.get("cai_score", 0.0)
+    sol = ch.get("solubility_score", 0.0)
+    gc = cks.get("gc_content", 0.5)
+    gc_fit = max(0, 1.0 - (abs(gc - 0.55) / 0.55))
+    rna = cks.get("rna_secondary_structure", -10)
+    rna_fit = max(0, 1.0 - (abs(min(0, rna)) / 30.0))
+    
+    values = [cai, sol, gc_fit, rna_fit]
+    metrics = ["CAI", "Solubility", "GC Fitness", "RNA Fold"]
+    
+    values += values[:1]
+    angles = [n / 4 * 2 * pi for n in range(4)]
+    angles += angles[:1]
+    
+    ax.plot(angles, values, linewidth=1.5, linestyle='solid', color=_PURPLE)
+    ax.fill(angles, values, color=_PURPLE, alpha=0.25)
+    ax.set_ylim(0, 1.0)
+    ax.set_yticks([0.2, 0.4, 0.6, 0.8, 1.0])
+    ax.set_yticklabels([], color="grey", size=6)
+    
+    # We must set xticks inside the subplot axis explicitly
+    ax.set_xticks(angles[:-1])
+    ax.set_xticklabels(metrics, color=_DKGREY, size=8, fontweight="bold")
+    ax.set_title("(d) Sequence Fitness Radar", loc="left", fontweight="bold", pad=8)
+
+
 # ── Combined figure ──────────────────────────────────────────────────
 
 def _build_combined_figure(summary: dict, out: Path) -> Path:
@@ -337,11 +376,11 @@ def _build_combined_figure(summary: dict, out: Path) -> Path:
 
     Layout (2 rows × 2 cols):
         Row 0:  (a) Cassette architecture  |  (b) Plasmid construct
-        Row 1:  (c) Key metrics overview   |  (Empty)
+        Row 1:  (c) Key metrics overview   |  (d) Radar chart
     """
     _apply_theme()
 
-    fig = plt.figure(figsize=(14, 8))
+    fig = plt.figure(figsize=(14, 10))
     gs = gridspec.GridSpec(2, 2, figure=fig, hspace=0.38, wspace=0.30)
 
     # (a) Cassette architecture
@@ -355,6 +394,10 @@ def _build_combined_figure(summary: dict, out: Path) -> Path:
     # (c) Overview gauges
     ax_over = fig.add_subplot(gs[1, 0])
     _panel_overview(ax_over, summary)
+
+    # (d) Radar chart
+    ax_radar = fig.add_subplot(gs[1, 1], polar=True)
+    _panel_radar(ax_radar, summary)
 
     # Suptitle
     protein = summary.get("protein", {})
