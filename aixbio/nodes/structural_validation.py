@@ -22,15 +22,23 @@ def structural_validation(state: PipelineState) -> dict:
         return {"structure_report": None}
 
     results = []
+    warnings: list[str] = []
     for cr in chain_results:
         chain_id = cr["chain_id"]
-        dna_seq = cr.get("cassette_dna") or cr.get("optimized_dna_sequence", "")
+        dna_seq = cr.get("optimized_dna_sequence") or cr.get("cassette_dna", "")
         if not dna_seq:
-            logger.warning(f"No DNA sequence available for chain {chain_id}, skipping Evo2")
+            msg = f"No DNA sequence available for chain {chain_id}, skipping Evo2"
+            logger.warning(msg)
+            warnings.append(msg)
             continue
-        results.append(score_dna(chain_id, dna_seq))
+        evo_result = score_dna(chain_id, dna_seq)
+        if evo_result.method == "evo2_truncated":
+            warnings.append(
+                f"Chain {chain_id}: sequence truncated to 4096 bp for Evo2 scoring"
+            )
+        results.append(evo_result)
 
     if not results:
-        return {"structure_report": None}
+        return {"structure_report": None, "warnings": warnings}
 
-    return {"structure_report": Evo2Report(chains=tuple(results))}
+    return {"structure_report": Evo2Report(chains=tuple(results)), "warnings": warnings}

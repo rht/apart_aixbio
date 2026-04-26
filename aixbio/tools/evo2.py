@@ -1,8 +1,7 @@
 from __future__ import annotations
 
 import logging
-
-from biolmai import Model
+import os
 
 from aixbio.models.structure import Evo2Result
 
@@ -19,9 +18,18 @@ def score_dna(chain_id: str, dna_sequence: str) -> Evo2Result:
     Sequences longer than 4096 bp are truncated to stay within the model's
     context window.
     """
+    if not (os.environ.get("BIOLMAI_TOKEN") or os.environ.get("BIOLM_TOKEN")):
+        raise RuntimeError(
+            "Evo2 validation requires BIOLMAI_TOKEN in .env. "
+            "Get a token from https://biolm.ai or run `biolmai login`."
+        )
+
+    from biolmai import Model
+
     seq = dna_sequence.upper()
     seq_len = len(seq)
 
+    truncated = False
     if seq_len > _MAX_SEQUENCE_LENGTH:
         logger.warning(
             f"Chain {chain_id}: {seq_len} bp exceeds Evo2 context ({_MAX_SEQUENCE_LENGTH} bp), "
@@ -29,21 +37,33 @@ def score_dna(chain_id: str, dna_sequence: str) -> Evo2Result:
         )
         seq = seq[:_MAX_SEQUENCE_LENGTH]
         seq_len = _MAX_SEQUENCE_LENGTH
+        truncated = True
 
     model = Model(_MODEL_NAME, progress=False)
     result = model.predict(items=[{"sequence": seq}])
 
-    if isinstance(result, dict) and "error" in result:
-        logger.error(f"Evo2 API error for chain {chain_id}: {result['error']}")
+    record = result[0] if isinstance(result, list) and result else result
+    if isinstance(record, dict) and "error" in record:
+        logger.error(f"Evo2 API error for chain {chain_id}: {record['error']}")
         return Evo2Result(
             id=chain_id,
-            log_prob=0.0,
-            mean_log_prob=0.0,
+            log_prob=None,
+            mean_log_prob=None,
             sequence_length=seq_len,
             method="evo2_failed",
         )
 
-    log_prob = result.get("log_prob", 0.0) if isinstance(result, dict) else result[0].get("log_prob", 0.0)
+    log_prob = record.get("log_prob") if isinstance(record, dict) else None
+    if log_prob is None:
+        logger.error(f"Evo2 returned no log_prob for chain {chain_id}: {record!r}")
+        return Evo2Result(
+            id=chain_id,
+            log_prob=None,
+            mean_log_prob=None,
+            sequence_length=seq_len,
+            method="evo2_failed",
+        )
+
     mean_log_prob = log_prob / seq_len if seq_len > 0 else 0.0
 
     logger.info(
@@ -51,10 +71,11 @@ def score_dna(chain_id: str, dna_sequence: str) -> Evo2Result:
         f"log_prob={log_prob:.2f}, mean={mean_log_prob:.4f}/nt"
     )
 
+    method = "evo2_truncated" if truncated else "evo2"
     return Evo2Result(
         id=chain_id,
         log_prob=log_prob,
         mean_log_prob=round(mean_log_prob, 6),
         sequence_length=seq_len,
-        method="evo2",
+        method=method,
     )

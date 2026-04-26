@@ -19,7 +19,7 @@ echo "OPENROUTER_API_KEY=sk-..." > .env
 uv run python -m aixbio P01308                   # interactive (human review prompts)
 uv run python -m aixbio P01308 --auto-approve    # fully automated
 uv run python -m aixbio P01308 --escalation      # enable LLM fallback on hard failures
-uv run python -m aixbio P01308 --structural      # add ESMFold/AlphaFold structure check
+uv run python -m aixbio P01308 --structural      # Evo2 DNA log-prob scoring (requires BIOLMAI_TOKEN)
 uv run python -m aixbio P01308 --protocol        # generate literature-backed wet-lab SOP
 uv run python -m aixbio P01308 --auto-approve --structural --protocol --escalation
 ```

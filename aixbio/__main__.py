@@ -171,11 +171,14 @@ def _print_results(result: dict):
     if structure:
         print(f"\nDNA Validation (Evo2):")
         for sr in structure.chains:
-            print(
-                f"  Chain {sr.id}: log_prob={sr.log_prob:.2f}, "
-                f"mean={sr.mean_log_prob:.4f}/nt, "
-                f"len={sr.sequence_length} bp [{sr.method}]"
-            )
+            if sr.log_prob is None:
+                print(f"  Chain {sr.id}: FAILED [{sr.method}], len={sr.sequence_length} bp")
+            else:
+                print(
+                    f"  Chain {sr.id}: log_prob={sr.log_prob:.2f}, "
+                    f"mean={sr.mean_log_prob:.4f}/nt, "
+                    f"len={sr.sequence_length} bp [{sr.method}]"
+                )
 
     chain_results = result.get("chain_results", [])
     if chain_results:

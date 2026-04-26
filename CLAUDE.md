@@ -15,7 +15,7 @@ uv sync
 # Run pipeline
 uv run aixbio P01308                          # insulin, with human checkpoints
 uv run aixbio P01308 --auto-approve           # skip human review prompts
-uv run aixbio P01308 --structural             # include AlphaFold step (stubbed)
+uv run aixbio P01308 --structural             # Evo2 DNA log-prob scoring (requires BIOLMAI_TOKEN)
 uv run aixbio P01308 --escalation             # enable LLM escalation on remediation failure
 
 # Run tests
@@ -28,7 +28,7 @@ uv run pytest tests/test_escalation.py        # escalation agent (mocked LLM)
 
 ## Environment
 
-Requires `OPENROUTER_API_KEY` in `.env`. The LLM model defaults to `deepseek/deepseek-v4-flash` via OpenRouter (`LLM_MODEL` env var). Step 1 (sequence retrieval) always makes an LLM call. The escalation agent (`--escalation` flag) makes one LLM call per chain only when the deterministic remediation loop exhausts its retry budget. All other steps are deterministic.
+Requires `OPENROUTER_API_KEY` in `.env`. The LLM model defaults to `deepseek/deepseek-v4-flash` via OpenRouter (`LLM_MODEL` env var). Step 1 (sequence retrieval) always makes an LLM call. The escalation agent (`--escalation` flag) makes one LLM call per chain only when the deterministic remediation loop exhausts its retry budget. All other steps are deterministic. Requires `BIOLMAI_TOKEN` in `.env` when `--structural` is used (Evo2 DNA scoring via biolm.ai).
 
 ## Architecture
 
