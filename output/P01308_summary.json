@@ -19,13 +19,13 @@
         {
           "name": "gc_content",
           "passed": true,
-          "value": 0.5333,
+          "value": 0.5367,
           "threshold": "0.50-0.60"
         },
         {
           "name": "cai_score",
           "passed": true,
-          "value": 0.8721,
+          "value": 0.8784,
           "threshold": "> 0.8"
         },
         {
@@ -93,11 +93,10 @@
   "structure_report": [
     {
       "chain_id": "Insulin_P01308",
-      "plddt_mean": 0.53,
-      "rmsd_to_ref": 4.027,
-      "perplexity": null,
-      "structure_file": "output/structures/esm_Insulin_P01308.pdb",
-      "method": "esmfold"
+      "log_prob": -342.13671875,
+      "mean_log_prob": -1.326111,
+      "sequence_length": 258,
+      "method": "evo2"
     }
   ],
   "plasmids": [
@@ -117,7 +116,7 @@
     {
       "chain_id": "Insulin_P01308",
       "insert_length": 312,
-      "gc_content": 0.538,
+      "gc_content": 0.542,
       "longest_homopolymer": 4,
       "vendors": [
         {

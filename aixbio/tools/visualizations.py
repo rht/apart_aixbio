@@ -35,11 +35,10 @@ _DKGREY   = "#666666"
 _LTGREY   = "#E5E5E5"
 _PALETTE  = [_BLUE, _RED, _GREEN, _PURPLE, _CYAN, _YELLOW]
 
-# AlphaFold canonical pLDDT colour bands
-_AF_VHIGH = "#0053D6"
-_AF_CONF  = "#65CBF3"
-_AF_LOW   = "#FFDB13"
-_AF_VLOW  = "#FF7D45"
+# Evo2 log-prob quality tiers (mean log-prob per nucleotide)
+_EVO2_GOOD  = "#228833"  # > -0.3
+_EVO2_OK    = "#CCBB44"  # -0.3 to -0.5
+_EVO2_POOR  = "#EE6677"  # < -0.5
 
 _DPI = 300
 
@@ -78,7 +77,6 @@ def _apply_theme() -> None:
         "axes.linewidth":     0.8,
         "axes.grid":          False,
         "grid.color":         _LTGREY,
-        "grid.linewidth":     0.4,
         "grid.alpha":         0.6,
         "legend.frameon":     True,
         "legend.edgecolor":   _LTGREY,
@@ -93,24 +91,19 @@ _apply_theme()
 
 # ── Helpers ──────────────────────────────────────────────────────────
 
-def _normalise_plddt(v: float) -> float:
-    """Ensure pLDDT is on a 0-100 scale (some pipelines return 0-1)."""
-    return v * 100 if v <= 1.0 else v
+def _evo2_color(mean_log_prob: float | None) -> str:
+    """Return quality-tier colour for an Evo2 mean log-prob value."""
+    if mean_log_prob is None:
+        return _GREY
+    if mean_log_prob > -0.3:
+        return _EVO2_GOOD
+    if mean_log_prob > -0.5:
+        return _EVO2_OK
+    return _EVO2_POOR
 
 
-def _plddt_color(v: float) -> str:
-    """Return AlphaFold confidence-band colour for a pLDDT value (0-100)."""
-    if v >= 90:
-        return _AF_VHIGH
-    if v >= 70:
-        return _AF_CONF
-    if v >= 50:
-        return _AF_LOW
-    return _AF_VLOW
-
-
-def _extract_numeric_checks(chains: list[dict]) -> list[tuple[str, str, float, bool, str]]:
-    """Return (chain_id, check_name, value, passed, threshold) for numeric checks."""
+def _extract_numeric_checks(chains: list[dict]) -> list[tuple]:
+    """Pull only numeric validation checks for plotting."""
     rows = []
     for ch in chains:
         cid = ch.get("chain_id", "?")
@@ -122,7 +115,7 @@ def _extract_numeric_checks(chains: list[dict]) -> list[tuple[str, str, float, b
     return rows
 
 
-# ── Panel A: Sequence quality metrics (normalised 0-1 radar) ────────
+# ── Panel A: Sequence quality metrics ────────────────────────────────
 
 def _panel_validation(ax: plt.Axes, summary: dict) -> None:
     """Horizontal bar chart with paired value + threshold annotations."""
@@ -172,108 +165,149 @@ def _panel_validation(ax: plt.Axes, summary: dict) -> None:
     ax.legend(handles=handles, loc="lower right", fontsize=7)
 
 
-# ── Panel B: Structure confidence (pLDDT + RMSD) ────────────────────
+# ── Panel B: Evo2 DNA log-probability ────────────────────────────────
 
-def _panel_structure(ax_plddt: plt.Axes, ax_rmsd: plt.Axes | None,
-                     summary: dict) -> None:
-    """pLDDT bar with AlphaFold confidence bands, plus RMSD panel."""
+def _panel_evo2(ax: plt.Axes, summary: dict) -> None:
+    """Horizontal bar chart of Evo2 per-nucleotide log-probability scores."""
     recs = summary.get("structure_report", [])
     if not recs:
-        ax_plddt.set_visible(False)
-        if ax_rmsd is not None:
-            ax_rmsd.set_visible(False)
+        ax.set_visible(False)
+        return
+
+    # Detect data format: new Evo2 vs legacy ESMFold
+    # If any record lacks 'mean_log_prob', this is legacy data
+    has_evo2 = any(r.get("mean_log_prob") is not None for r in recs)
+    if not has_evo2:
+        ax.set_visible(False)
         return
 
     ids = [r.get("chain_id", "?") for r in recs]
-    plddts_raw = [r.get("plddt_mean", 0) for r in recs]
-    plddts = [_normalise_plddt(p) for p in plddts_raw]
-    rmsds = [r.get("rmsd_to_ref") for r in recs]
-    methods = [r.get("method", "?") for r in recs]
+    mean_lps = [r.get("mean_log_prob", 0) or 0 for r in recs]
+    total_lps = [r.get("log_prob") for r in recs]
+    seq_lens = [r.get("sequence_length", 0) for r in recs]
+    methods = [r.get("method", "evo2") for r in recs]
+    colors = [_evo2_color(lp) for lp in mean_lps]
 
     y = np.arange(len(ids))
 
-    # ── pLDDT ──
-    colors = [_plddt_color(p) for p in plddts]
-    bars = ax_plddt.barh(y, plddts, color=colors, height=0.45,
-                         edgecolor="white", linewidth=0.5, zorder=3)
-    ax_plddt.set_yticks(y)
-    ax_plddt.set_yticklabels(ids, fontfamily="monospace", fontsize=8)
-    ax_plddt.set_xlim(0, 100)
-    ax_plddt.set_xlabel("pLDDT score")
-    ax_plddt.invert_yaxis()
+    # Plot negative values as positive bars for readability (annotate true value)
+    abs_vals = [abs(v) for v in mean_lps]
 
-    # Shaded confidence bands
-    for lo, hi, c in [(0, 50, _AF_VLOW), (50, 70, _AF_LOW),
-                      (70, 90, _AF_CONF), (90, 100, _AF_VHIGH)]:
-        ax_plddt.axvspan(lo, hi, color=c, alpha=0.07, zorder=0)
-
-    for bar, plddt, method in zip(bars, plddts, methods):
-        label = {"esmfold": "ESMFold", "afdb": "AFDB",
-                 "afdb_fallback": "AFDB*"}.get(method, method)
-        ax_plddt.text(
-            min(plddt + 2, 92), bar.get_y() + bar.get_height() / 2,
-            f"{plddt:.1f}  ({label})", va="center", fontsize=8, color=_BLACK)
-
-    ax_plddt.set_title("(b) Structure Confidence (pLDDT)", loc="left",
-                       fontweight="bold", pad=8)
-
-    band_patches = [
-        mpatches.Patch(color=_AF_VHIGH, label="Very high (≥ 90)"),
-        mpatches.Patch(color=_AF_CONF,  label="Confident (≥ 70)"),
-        mpatches.Patch(color=_AF_LOW,   label="Low (≥ 50)"),
-        mpatches.Patch(color=_AF_VLOW,  label="Very low (< 50)"),
-    ]
-    ax_plddt.legend(handles=band_patches, loc="lower right", fontsize=6,
-                    title="AlphaFold confidence", title_fontsize=6)
-
-    # ── RMSD ──
-    if ax_rmsd is None:
-        return
-    has_rmsd = any(r is not None for r in rmsds)
-    if not has_rmsd:
-        ax_rmsd.set_visible(False)
-        return
-
-    rmsd_vals = [r if r is not None else 0 for r in rmsds]
-    rmsd_colors = []
-    for r in rmsds:
-        if r is None:
-            rmsd_colors.append(_GREY)
-        elif r < 2:
-            rmsd_colors.append(_GREEN)
-        elif r < 5:
-            rmsd_colors.append(_YELLOW)
-        else:
-            rmsd_colors.append(_RED)
-
-    bars2 = ax_rmsd.barh(y, rmsd_vals, color=rmsd_colors, height=0.45,
-                         edgecolor="white", linewidth=0.5, zorder=3)
-    ax_rmsd.set_yticks(y)
-    ax_rmsd.set_yticklabels(ids, fontfamily="monospace", fontsize=8)
-    ax_rmsd.set_xlabel("RMSD (Å)")
-    ax_rmsd.invert_yaxis()
-    ax_rmsd.set_title("(c) RMSD to Reference", loc="left",
-                      fontweight="bold", pad=8)
+    bars = ax.barh(y, abs_vals, color=colors, height=0.5,
+                   edgecolor="white", linewidth=0.5, zorder=3)
+    ax.set_yticks(y)
+    ax.set_yticklabels(ids, fontfamily="monospace", fontsize=8)
+    ax.set_xlabel("| mean log-prob / nt |")
+    ax.invert_yaxis()
+    ax.set_title("(b) Evo2 DNA Quality Score", loc="left",
+                 fontweight="bold", pad=8)
 
     # Quality thresholds
-    ax_rmsd.axvline(x=2, color=_GREEN, linestyle=":", linewidth=0.7, alpha=0.8)
-    ax_rmsd.axvline(x=5, color=_RED, linestyle=":", linewidth=0.7, alpha=0.8)
+    ax.axvline(x=0.3, color=_EVO2_GOOD, linestyle=":", linewidth=0.8, alpha=0.8)
+    ax.axvline(x=0.5, color=_EVO2_POOR, linestyle=":", linewidth=0.8, alpha=0.8)
 
-    for bar, val in zip(bars2, rmsd_vals):
-        if val > 0:
-            ax_rmsd.text(bar.get_width() + 0.1,
-                         bar.get_y() + bar.get_height() / 2,
-                         f"{val:.2f} Å", va="center", fontsize=8, color=_BLACK)
+    # Annotations
+    for bar, mlp, tlp, sl, method in zip(bars, mean_lps, total_lps, seq_lens, methods):
+        method_label = {"evo2": "Evo2", "evo2_truncated": "Evo2*"}.get(method, method)
+        total_str = f"{tlp:.1f}" if tlp is not None else "N/A"
+        ax.text(bar.get_width() + 0.01,
+                bar.get_y() + bar.get_height() / 2,
+                f"{mlp:.4f}/nt  ({method_label}, {sl} bp)",
+                va="center", fontsize=7.5, color=_BLACK)
 
-    rmsd_patches = [
-        mpatches.Patch(color=_GREEN, label="< 2 Å (excellent)"),
-        mpatches.Patch(color=_YELLOW, label="2–5 Å (acceptable)"),
-        mpatches.Patch(color=_RED, label="> 5 Å (poor)"),
+    # Legend
+    tier_patches = [
+        mpatches.Patch(color=_EVO2_GOOD, label="Good (> −0.3)"),
+        mpatches.Patch(color=_EVO2_OK, label="Acceptable (−0.3 to −0.5)"),
+        mpatches.Patch(color=_EVO2_POOR, label="Poor (< −0.5)"),
     ]
-    ax_rmsd.legend(handles=rmsd_patches, loc="lower right", fontsize=6)
+    ax.legend(handles=tier_patches, loc="lower right", fontsize=6,
+              title="Mean log-prob quality", title_fontsize=6)
 
 
-# ── Panel C: Plasmid construct (donut) ───────────────────────────────
+# ── Panel C: Expression cassette architecture ────────────────────────
+
+def _panel_cassette(ax: plt.Axes, summary: dict) -> None:
+    """Horizontal stacked bar showing expression cassette elements."""
+    chains = summary.get("chains", [])
+    plasmids = summary.get("plasmids", [])
+    if not chains or not plasmids:
+        ax.set_visible(False)
+        return
+
+    # Calculate cassette element sizes from known constants
+    # ATG (3 bp) + 6xHis (18 bp) + EK site (15 bp) + gene + stop (6 bp)
+    START_LEN = 3   # ATG
+    TAG_LEN = 18    # 6xHis = CAC×6
+    EK_LEN = 15     # DDDDK = 5 codons
+    STOP_LEN = 6    # TAATAA
+
+    ids = []
+    elements_list = []
+    for pm in plasmids:
+        chain_id = pm.get("chain_id", "?")
+        insert_size = pm.get("insert_size", 0)
+        gene_len = max(0, insert_size - START_LEN - TAG_LEN - EK_LEN - STOP_LEN)
+
+        ids.append(chain_id)
+        elements_list.append([
+            ("ATG", START_LEN),
+            ("6×His", TAG_LEN),
+            ("EK site", EK_LEN),
+            ("Gene", gene_len),
+            ("Stop", STOP_LEN),
+        ])
+
+    if not ids:
+        ax.set_visible(False)
+        return
+
+    y = np.arange(len(ids))
+    element_colors = {
+        "ATG": _RED,
+        "6×His": _BLUE,
+        "EK site": _CYAN,
+        "Gene": _GREEN,
+        "Stop": _PURPLE,
+    }
+
+    for i, elements in enumerate(elements_list):
+        left = 0
+        for name, size in elements:
+            ax.barh(i, size, left=left, height=0.5,
+                    color=element_colors.get(name, _GREY),
+                    edgecolor="white", linewidth=0.8, zorder=3)
+            # Label inside bar if wide enough
+            if size > 20:
+                ax.text(left + size / 2, i, f"{name}\n{size} bp",
+                        ha="center", va="center", fontsize=6.5,
+                        color="white", fontweight="bold")
+            left += size
+
+        # Total annotation
+        total = sum(s for _, s in elements)
+        ax.text(left + 3, i, f"{total} bp",
+                va="center", fontsize=8, fontweight="bold", color=_BLACK)
+
+    ax.set_yticks(y)
+    ax.set_yticklabels(ids, fontfamily="monospace", fontsize=8)
+    ax.set_xlabel("Cassette length (bp)")
+    ax.invert_yaxis()
+    ax.set_title("(c) Expression Cassette Architecture", loc="left",
+                 fontweight="bold", pad=8)
+
+    # Legend
+    legend_patches = [
+        mpatches.Patch(color=element_colors["ATG"], label="Start codon"),
+        mpatches.Patch(color=element_colors["6×His"], label="6×His tag"),
+        mpatches.Patch(color=element_colors["EK site"], label="Protease site"),
+        mpatches.Patch(color=element_colors["Gene"], label="Gene"),
+        mpatches.Patch(color=element_colors["Stop"], label="Double stop"),
+    ]
+    ax.legend(handles=legend_patches, loc="lower right", fontsize=6, ncol=2)
+
+
+# ── Panel D: Plasmid construct (donut) ───────────────────────────────
 
 def _panel_plasmid(ax: plt.Axes, summary: dict) -> None:
     """Donut chart – first plasmid construct."""
@@ -327,7 +361,7 @@ def _panel_plasmid(ax: plt.Axes, summary: dict) -> None:
                 transform=ax.transAxes)
 
 
-# ── Panel D: Synthesis vendor comparison ─────────────────────────────
+# ── Panel E: Synthesis vendor comparison ─────────────────────────────
 
 def _panel_synthesis(ax: plt.Axes, summary: dict) -> None:
     """Grouped bar chart with cost + feasibility + turnaround."""
@@ -385,7 +419,7 @@ def _panel_synthesis(ax: plt.Axes, summary: dict) -> None:
     ax.set_ylim(0, ymax * 1.25)
 
 
-# ── Panel E: Pipeline overview gauges ────────────────────────────────
+# ── Panel F: Pipeline overview gauges ────────────────────────────────
 
 def _panel_overview(ax: plt.Axes, summary: dict) -> None:
     """Normalised 0-100% gauge bars for key metrics.
@@ -414,10 +448,14 @@ def _panel_overview(ax: plt.Axes, summary: dict) -> None:
     if sol is not None:
         raw.append(("Solubility", sol, (0.0, 1.0), 0.45, _CYAN))
 
+    # Evo2 mean log-prob (replaces old pLDDT)
     struct = summary.get("structure_report", [])
     if struct:
-        plddt = _normalise_plddt(struct[0].get("plddt_mean", 0))
-        raw.append(("pLDDT", plddt, (0.0, 100.0), 70.0, _PURPLE))
+        rec = struct[0]
+        mlp = rec.get("mean_log_prob")
+        if mlp is not None:
+            # Scale: log-prob range roughly -1.0 to 0.0, threshold at -0.3
+            raw.append(("Evo2 (log-prob/nt)", mlp, (-1.0, 0.0), -0.3, _PURPLE))
 
     if not raw:
         ax.set_visible(False)
@@ -439,7 +477,7 @@ def _panel_overview(ax: plt.Axes, summary: dict) -> None:
         labels.append(label)
         pct_vals.append(pct)
         pct_thresholds.append(pct_thr)
-        raw_strs.append(f"{val:.3f}" if val < 10 else f"{val:.1f}")
+        raw_strs.append(f"{val:.4f}" if abs(val) < 1 else f"{val:.3f}" if abs(val) < 10 else f"{val:.1f}")
         colors.append(color)
 
     y = np.arange(len(labels))
@@ -487,9 +525,9 @@ def _build_combined_figure(summary: dict, out: Path) -> Path:
     """Create a single multi-panel figure combining all visualisations.
 
     Layout (3 rows × 2 cols):
-        Row 0:  (a) Validation checks  |  (b) pLDDT confidence
-        Row 1:  (c) RMSD to ref        |  (d) Plasmid construct
-        Row 2:  (e) Synthesis costs     |  (f) Key metrics overview
+        Row 0:  (a) Validation checks     |  (b) Evo2 DNA quality
+        Row 1:  (c) Cassette architecture  |  (d) Plasmid construct
+        Row 2:  (e) Synthesis costs        |  (f) Key metrics overview
     """
     _apply_theme()
 
@@ -500,12 +538,13 @@ def _build_combined_figure(summary: dict, out: Path) -> Path:
     ax_val = fig.add_subplot(gs[0, 0])
     _panel_validation(ax_val, summary)
 
-    # (b) pLDDT
-    ax_plddt = fig.add_subplot(gs[0, 1])
+    # (b) Evo2 DNA quality
+    ax_evo2 = fig.add_subplot(gs[0, 1])
+    _panel_evo2(ax_evo2, summary)
 
-    # (c) RMSD
-    ax_rmsd = fig.add_subplot(gs[1, 0])
-    _panel_structure(ax_plddt, ax_rmsd, summary)
+    # (c) Cassette architecture
+    ax_cass = fig.add_subplot(gs[1, 0])
+    _panel_cassette(ax_cass, summary)
 
     # (d) Plasmid
     ax_plasm = fig.add_subplot(gs[1, 1])
@@ -555,24 +594,30 @@ def _save_individual(summary: dict, out: Path) -> list[Path]:
         plt.close(fig)
         paths.append(p)
 
-    # Structure quality
+    # Evo2 DNA quality
     struct = summary.get("structure_report", [])
-    if struct:
-        has_rmsd = any(s.get("rmsd_to_ref") is not None for s in struct)
-        ncols = 2 if has_rmsd else 1
-        fig, axes = plt.subplots(1, ncols,
-                                 figsize=(5 * ncols, max(3, len(struct) * 0.8 + 1)))
-        if ncols == 1:
-            axes = [axes]
-        _panel_structure(axes[0], axes[1] if has_rmsd else None, summary)
+    has_evo2 = any(s.get("mean_log_prob") is not None for s in struct)
+    if struct and has_evo2:
+        fig, ax = plt.subplots(figsize=(7, max(2.5, len(struct) * 0.8 + 1)))
+        _panel_evo2(ax, summary)
         fig.tight_layout()
-        p = out / "structure_quality.png"
+        p = out / "evo2_quality.png"
+        fig.savefig(p, dpi=_DPI)
+        plt.close(fig)
+        paths.append(p)
+
+    # Cassette architecture
+    plasmids = summary.get("plasmids", [])
+    if plasmids:
+        fig, ax = plt.subplots(figsize=(7, max(2.5, len(plasmids) * 0.8 + 1)))
+        _panel_cassette(ax, summary)
+        fig.tight_layout()
+        p = out / "cassette_architecture.png"
         fig.savefig(p, dpi=_DPI)
         plt.close(fig)
         paths.append(p)
 
     # Plasmid
-    plasmids = summary.get("plasmids", [])
     for i, pm in enumerate(plasmids):
         fig, ax = plt.subplots(figsize=(5, 5))
         # Build a mini-summary with just this plasmid

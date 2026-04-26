@@ -305,10 +305,9 @@ def _write_artifacts(result: dict, compound_id: str, output_dir: str):
         summary["structure_report"] = [
             {
                 "chain_id": sr.id,
-                "plddt_mean": sr.plddt_mean,
-                "rmsd_to_ref": sr.rmsd_to_ref,
-                "perplexity": sr.perplexity,
-                "structure_file": sr.structure_file,
+                "log_prob": sr.log_prob,
+                "mean_log_prob": sr.mean_log_prob,
+                "sequence_length": sr.sequence_length,
                 "method": sr.method,
             }
             for sr in structure.chains

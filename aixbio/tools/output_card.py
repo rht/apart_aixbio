@@ -110,45 +110,46 @@ def generate_output_card(summary: dict, output_dir: str | Path) -> Path:
           </div>
         </div>"""
 
-    # ── Structure Report Section ──────────────────────────────────────
+    # ── DNA Quality (Evo2) Section ──────────────────────────────────────
     structure_html = ""
     if structure_chains:
         struct_rows = ""
         for sr in structure_chains:
             sr_id = html.escape(str(sr.get("chain_id", "")))
-            plddt = sr.get("plddt_mean", 0)
-            rmsd = sr.get("rmsd_to_ref")
+            log_prob = sr.get("log_prob")
+            mean_log_prob = sr.get("mean_log_prob")
+            seq_length = sr.get("sequence_length", 0)
             method = sr.get("method", "unknown")
-            struct_file = sr.get("structure_file", "")
-            perplexity = sr.get("perplexity")
 
-            # pLDDT confidence colour
-            if plddt >= 90:
-                plddt_color = "#16a34a"
-                plddt_label = "Very high"
-            elif plddt >= 70:
-                plddt_color = "#2563eb"
-                plddt_label = "Confident"
-            elif plddt >= 50:
-                plddt_color = "#f59e0b"
-                plddt_label = "Low"
+            # Quality tier based on mean log-prob per nt
+            if mean_log_prob is not None:
+                if mean_log_prob > -0.3:
+                    quality_color = "#16a34a"
+                    quality_label = "Good"
+                elif mean_log_prob > -0.5:
+                    quality_color = "#f59e0b"
+                    quality_label = "Acceptable"
+                else:
+                    quality_color = "#dc2626"
+                    quality_label = "Poor"
+                # Normalise to 0-100 bar (range: -1.0 to 0.0)
+                bar_pct = max(0, min(100, int((mean_log_prob + 1.0) * 100)))
+                mean_str = f"{mean_log_prob:.4f}/nt"
             else:
-                plddt_color = "#dc2626"
-                plddt_label = "Very low"
-
-            plddt_pct = min(round(plddt), 100)
+                quality_color = "#64748b"
+                quality_label = "N/A"
+                bar_pct = 0
+                mean_str = "N/A"
 
             # Method badge
             method_labels = {
-                "esmfold": ("ESMFold", "#8b5cf6"),
-                "afdb": ("AlphaFold DB", "#2563eb"),
-                "afdb_fallback": ("AFDB (fallback)", "#f59e0b"),
+                "evo2": ("Evo2", "#8b5cf6"),
+                "evo2_truncated": ("Evo2 (truncated)", "#f59e0b"),
+                "evo2_failed": ("Evo2 (failed)", "#dc2626"),
             }
             m_label, m_color = method_labels.get(method, (method.upper(), "#64748b"))
 
-            rmsd_str = f"{rmsd:.3f} Å" if rmsd is not None else "N/A"
-            perp_str = f"{perplexity:.2f}" if perplexity is not None else "—"
-            file_name = html.escape(Path(struct_file).name) if struct_file else "—"
+            total_str = f"{log_prob:.2f}" if log_prob is not None else "N/A"
 
             struct_rows += f"""
             <div class="struct-chain-card">
@@ -158,21 +159,20 @@ def generate_output_card(summary: dict, output_dir: str | Path) -> Path:
               </div>
               <div class="struct-metrics">
                 <div class="struct-metric">
-                  <span class="metric-label">pLDDT</span>
-                  <div class="bar-track"><div class="bar-fill" style="width:{plddt_pct}%;background:{plddt_color}"></div></div>
-                  <span class="metric-value">{plddt:.1f} &mdash; {plddt_label}</span>
+                  <span class="metric-label">Mean log-prob</span>
+                  <div class="bar-track"><div class="bar-fill" style="width:{bar_pct}%;background:{quality_color}"></div></div>
+                  <span class="metric-value">{mean_str} &mdash; {quality_label}</span>
                 </div>
                 <div class="struct-stats-row">
-                  <div class="struct-stat"><span class="struct-stat-label">RMSD</span><span class="struct-stat-val">{rmsd_str}</span></div>
-                  <div class="struct-stat"><span class="struct-stat-label">Perplexity</span><span class="struct-stat-val">{perp_str}</span></div>
-                  <div class="struct-stat"><span class="struct-stat-label">File</span><span class="struct-stat-val file-mono">{file_name}</span></div>
+                  <div class="struct-stat"><span class="struct-stat-label">Total log-prob</span><span class="struct-stat-val">{total_str}</span></div>
+                  <div class="struct-stat"><span class="struct-stat-label">Sequence</span><span class="struct-stat-val">{seq_length} bp</span></div>
                 </div>
               </div>
             </div>"""
 
         structure_html = f"""
         <div class="section">
-          <h2>Structural Validation</h2>
+          <h2>DNA Quality (Evo2)</h2>
           {struct_rows}
         </div>"""
 
