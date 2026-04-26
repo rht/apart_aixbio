@@ -39,8 +39,8 @@ def score_dna(chain_id: str, dna_sequence: str) -> Evo2Result:
         seq_len = _MAX_SEQUENCE_LENGTH
         truncated = True
 
-    model = Model(_MODEL_NAME, progress=False)
-    result = model.predict(items=[{"sequence": seq}])
+    model = Model(_MODEL_NAME)
+    result = model.predict(items=[{"sequence": seq}], progress=False)
 
     record = result[0] if isinstance(result, list) and result else result
     if isinstance(record, dict) and "error" in record:
