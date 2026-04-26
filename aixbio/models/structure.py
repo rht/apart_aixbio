@@ -4,16 +4,14 @@ from dataclasses import dataclass
 
 
 @dataclass(frozen=True)
-class StructureResult:
+class Evo2Result:
     id: str
-    plddt_mean: float
-    rmsd_to_ref: float | None
-    perplexity: float | None
-    structure_file: str
-    # "esmfold" | "afdb" | "afdb_fallback" | "esmfold_failed" | "unknown"
-    method: str = "unknown"
+    log_prob: float
+    mean_log_prob: float
+    sequence_length: int
+    method: str = "evo2"
 
 
 @dataclass(frozen=True)
-class StructureReport:
-    chains: tuple[StructureResult, ...]
+class Evo2Report:
+    chains: tuple[Evo2Result, ...]

@@ -169,12 +169,13 @@ def _print_results(result: dict):
 
     structure = result.get("structure_report")
     if structure:
-        print(f"\nStructural Validation (AlphaFold):")
+        print(f"\nDNA Validation (Evo2):")
         for sr in structure.chains:
-            rmsd_str = f"{sr.rmsd_to_ref:.3f} Å" if sr.rmsd_to_ref is not None else "N/A"
-            print(f"  Chain {sr.id}: pLDDT={sr.plddt_mean:.1f}, RMSD={rmsd_str}")
-            if sr.structure_file:
-                print(f"    Structure file: {sr.structure_file}")
+            print(
+                f"  Chain {sr.id}: log_prob={sr.log_prob:.2f}, "
+                f"mean={sr.mean_log_prob:.4f}/nt, "
+                f"len={sr.sequence_length} bp [{sr.method}]"
+            )
 
     chain_results = result.get("chain_results", [])
     if chain_results:

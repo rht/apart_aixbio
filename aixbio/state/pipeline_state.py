@@ -7,7 +7,7 @@ from aixbio.models.biosafety import BiosafetyResult
 from aixbio.models.host import HostRecommendation
 from aixbio.models.protein import ProteinRecord
 from aixbio.models.remediation import RemediationAction
-from aixbio.models.structure import StructureReport
+from aixbio.models.structure import Evo2Report
 from aixbio.models.validation import ChainValidation, CheckResult, ValidationReport
 
 
@@ -79,7 +79,7 @@ class PipelineState(TypedDict):
     validation_report: ValidationReport | None
 
     # Step 6 output (optional)
-    structure_report: StructureReport | None
+    structure_report: Evo2Report | None
 
     # Protocol generation output (optional, requires --protocol flag)
     run_protocol_generation: bool
