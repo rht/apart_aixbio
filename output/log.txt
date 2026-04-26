@@ -1,0 +1,100 @@
+Starting pipeline for P01308 targeting Escherichia coli
+============================================================
+
+============================================================
+HUMAN REVIEW: chain_extraction_review
+============================================================
+{
+  "stage": "chain_extraction_review",
+  "protein": "Insulin",
+  "uniprot_id": "P01308",
+  "chains_extracted": [
+    {
+      "id": "Insulin_P01308",
+      "length": 86,
+      "sequence_preview": "FVNQHLCGSHLVEALYLVCGERGFFYTPKT..."
+    }
+  ],
+  "agent_reasoning": "Single-chain protein Insulin (P01308). Stripped 24 residue signal/transit peptide. Mature sequence: 86 aa.",
+  "question": "Approve chain extraction? Reply 'approve', 'reject', or provide corrections as JSON.",
+  "host_recommendation": {
+    "primary_host": "Escherichia coli",
+    "confidence": "medium",
+    "reasoning": "Short protein (86 aa) with 6 cysteines. E. coli expression as inclusion bodies followed by oxidative refolding is the established route (e.g. recombinant insulin).",
+    "alternative_hosts": [
+      "Pichia pastoris"
+    ],
+    "caveats": [
+      "Denaturing lysis (urea/guanidinium) required.",
+      "Refolding yield is protein-dependent; optimise glutathione redox ratio."
+    ]
+  }
+}
+
+Auto-approving (--auto-approve flag)
+============================================================
+HUMAN REVIEW: plasmid_review
+============================================================
+{
+  "stage": "plasmid_review",
+  "chain_results": [
+    {
+      "chain_id": "Insulin_P01308",
+      "validation_passed": true,
+      "remediation_rounds": 1,
+      "insert_size": 312
+    }
+  ],
+  "question": "Approve plasmids? Reply 'approve' or 'reject'."
+}
+
+Auto-approving (--auto-approve flag)
+
+============================================================
+PIPELINE RESULTS
+============================================================
+Status: completed
+
+Host Recommendation: Escherichia coli [medium confidence]
+  Reasoning: Short protein (86 aa) with 6 cysteines. E. coli expression as inclusion bodies followed by oxidative refolding is the established route (e.g. recombinant insulin).
+  Alternatives: Pichia pastoris
+  ! Denaturing lysis (urea/guanidinium) required.
+  ! Refolding yield is protein-dependent; optimise glutathione redox ratio.
+
+Warnings (3):
+  - [host_selection] Denaturing lysis (urea/guanidinium) required.
+  - [host_selection] Refolding yield is protein-dependent; optimise glutathione redox ratio.
+  - [Insulin_P01308] 6 cysteine residues detected — disulfide bond formation requires oxidative refolding or periplasmic expression.
+
+Validation: PASSED
+  Chain Insulin_P01308: PASS
+    [+] gc_content: 0.5433 (threshold: 0.50-0.60)
+    [+] cai_score: 0.8911 (threshold: > 0.8)
+    [+] restriction_sites: none (threshold: 0 hits)
+    [+] rna_secondary_structure: -0.7 (threshold: > -10 kcal/mol)
+    [+] back_translation: match (threshold: 100% identity)
+    [+] rare_codons: 0 (threshold: 0)
+    [+] direct_repeats: none (threshold: 0 repeats >= 20 bp)
+
+DNA Validation (Evo2):
+  Chain Insulin_P01308: log_prob=-340.96, mean=-1.3215/nt, len=258 bp [evo2]
+
+Chain Results (1):
+  Insulin_P01308:
+    Insert size: 312 bp
+    Remediation rounds: 1
+    Validation passed: True
+    Solubility: 0.59 [SOLUBLE]
+    Disulfide risk: YES (refolding required)
+
+Protocol generated (7589 chars) — written to output/protocol.md
+
+Agent Decisions (4):
+  [sequence_retrieval_agent] Extracted 1 chain(s) from P01308
+    Reasoning: Single-chain protein Insulin (P01308). Stripped 24 residue signal/transit peptide. Mature sequence: 86 aa.
+  [host_selection] recommend_host:Escherichia coli
+    Reasoning: Short protein (86 aa) with 6 cysteines. E. coli expression as inclusion bodies followed by oxidative refolding is the established route (e.g. recombinant insulin).
+  [remediation_agent] Planned 147 fixes for 4 failed checks
+    Reasoning: Deterministic fixes for: cai_score, gc_content, rare_codons, restriction_sites
+  [protocol_generation] generate_protocol
+    Reasoning: Generated SOP from 1 chain(s) + 5 PubMed article(s)
