@@ -1,7 +1,7 @@
 
 
 
-|  BioClaw: A LangGraph Agent Tool Suite for Biological Engineering Workflows[^1]  |
+|  BioClaw: An Agentic Tool Suite for Biological Engineering Workflows[^1]  |
 | ----- |
 |   Drew **With** Apart Research
 **Abstract** We present BioClaw, a modular agent framework for biological engineering workflows. We demonstrate it by converting human insulin (UniProt P01308) into validated, expression-ready DNA constructs for *E. coli*. Starting from a protein accession, the pipeline retrieves the sequence, optimizes codons, assembles expression cassettes, builds annotated constructs, and runs seven-point validation. The insulin construct passes all checks after one remediation round. BioClaw is built on LangGraph as a two-level state graph with composable nodes, typed state, human-in-the-loop checkpoints, and a full audit trail. The core pipeline is deterministic: an LLM is only invoked as a bounded escalation agent when rule-based remediation fails. New validation checks, pipeline steps, or expression hosts can be added through a repeatable extension pattern without restructuring the graph. We discuss the properties that make this approach well-suited for safety-critical biological workflows and show that composability, auditability, bounded AI agency, and testability emerge naturally from the graph-based architecture.
@@ -76,14 +76,6 @@ State is managed via TypedDict definitions with Annotated reducers for list accu
 **LLM escalation (optional).** If deterministic remediation is exhausted, an LLM agent fires once per chain. It receives the full remediation history as structured JSON and must return one of four typed outcomes: `apply_plan` (propose swaps the greedy loop missed), `incompatible` (host cannot express this protein), `change_strategy` (change tag/vector/protease and re-run), or `give_up` (unrecoverable). Responses are validated before any swap is applied. The `escalation_used` flag prevents re-entry.
 
 **Structural validation (optional).** When enabled, the pipeline scores each final DNA construct using Evo2-1B-base [6], a genomic foundation model accessed via the BioLM API. Evo2 returns per-nucleotide log-likelihoods; the pipeline computes a mean log-likelihood for the construct as a measure of sequence plausibility. This provides a learned, structure-aware quality signal complementary to the rule-based seven-point validation.
-
-### 3.4 Code Organization and Extensibility
-
-The codebase separates data definitions, computation, and workflow orchestration into independent layers. This separation provides three practical benefits:
-
-1. **Independent testability.** Biological computations (GC content, codon adaptation index, restriction site scanning) are pure functions that can be tested in isolation without running the pipeline.
-2. **Safe composability.** Each pipeline step returns only the state it changes. An append-only accumulation pattern for audit logs and remediation histories means steps cannot accidentally overwrite each other's records.
-3. **Low-cost extension.** Adding a new validation check requires writing one function and one line to invoke it from the validation step — no changes to data models, state management, or graph wiring. Adding an entirely new pipeline step (e.g., promoter strength prediction) requires changes in a few well-defined places, each in a different layer, with no risk of breaking existing steps.
 
 ## **4. Results**
 
