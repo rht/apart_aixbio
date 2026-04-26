@@ -91,139 +91,6 @@ _apply_theme()
 
 # ── Helpers ──────────────────────────────────────────────────────────
 
-def _evo2_color(mean_log_prob: float | None) -> str:
-    """Return quality-tier colour for an Evo2 mean log-prob value."""
-    if mean_log_prob is None:
-        return _GREY
-    if mean_log_prob > -0.3:
-        return _EVO2_GOOD
-    if mean_log_prob > -0.5:
-        return _EVO2_OK
-    return _EVO2_POOR
-
-
-def _extract_numeric_checks(chains: list[dict]) -> list[tuple]:
-    """Pull only numeric validation checks for plotting."""
-    rows = []
-    for ch in chains:
-        cid = ch.get("chain_id", "?")
-        for ck in ch.get("checks", []):
-            v = ck.get("value")
-            if isinstance(v, (int, float)):
-                rows.append((cid, ck["name"], float(v), ck["passed"],
-                             ck.get("threshold", "")))
-    return rows
-
-
-# ── Panel A: Sequence quality metrics ────────────────────────────────
-
-def _panel_validation(ax: plt.Axes, summary: dict) -> None:
-    """Horizontal bar chart with paired value + threshold annotations."""
-    chains = summary.get("chains", [])
-    rows = _extract_numeric_checks(chains)
-    if not rows:
-        ax.set_visible(False)
-        return
-
-    labels = [_LABEL_MAP.get(r[1], r[1]) for r in rows]
-    values = [r[2] for r in rows]
-    passed = [r[3] for r in rows]
-    thresholds = [r[4] for r in rows]
-    colors = [_GREEN if p else _RED for p in passed]
-
-    y = np.arange(len(labels))
-    bars = ax.barh(y, values, color=colors, height=0.5,
-                   edgecolor="white", linewidth=0.5, zorder=3)
-    ax.set_yticks(y)
-    ax.set_yticklabels(labels, fontsize=9)
-    ax.invert_yaxis()
-    ax.set_xlabel("Measured value")
-    ax.axvline(x=0, color=_DKGREY, linewidth=0.5, zorder=1)
-    ax.set_title("(a) Sequence Validation Metrics", loc="left",
-                 fontweight="bold", pad=8)
-
-    # Annotations: value + threshold placed to the right of each bar
-    max_abs = max(abs(v) for v in values) if values else 1
-    pad = max_abs * 0.04
-    for bar, val, thr in zip(bars, values, thresholds):
-        # For positive values: right of bar.  For negative: right of zero line.
-        if val >= 0:
-            x_txt = bar.get_width() + pad
-        else:
-            x_txt = pad  # just right of the zero line
-        ax.text(x_txt, bar.get_y() + bar.get_height() / 2,
-                f"{val:.2f}" if abs(val) < 10 else f"{val:.0f}",
-                va="center", ha="left", fontsize=8, color=_BLACK,
-                fontweight="bold")
-        if thr:
-            ax.text(x_txt, bar.get_y() + bar.get_height() / 2 + 0.22,
-                    f"thr: {thr}", va="center", ha="left",
-                    fontsize=6.5, color=_DKGREY, style="italic")
-
-    handles = [mpatches.Patch(facecolor=_GREEN, edgecolor="white", label="Pass"),
-               mpatches.Patch(facecolor=_RED, edgecolor="white", label="Fail")]
-    ax.legend(handles=handles, loc="lower right", fontsize=7)
-
-
-# ── Panel B: Evo2 DNA log-probability ────────────────────────────────
-
-def _panel_evo2(ax: plt.Axes, summary: dict) -> None:
-    """Horizontal bar chart of Evo2 per-nucleotide log-probability scores."""
-    recs = summary.get("structure_report", [])
-    if not recs:
-        ax.set_visible(False)
-        return
-
-    # Detect data format: new Evo2 vs legacy ESMFold
-    # If any record lacks 'mean_log_prob', this is legacy data
-    has_evo2 = any(r.get("mean_log_prob") is not None for r in recs)
-    if not has_evo2:
-        ax.set_visible(False)
-        return
-
-    ids = [r.get("chain_id", "?") for r in recs]
-    mean_lps = [r.get("mean_log_prob", 0) or 0 for r in recs]
-    total_lps = [r.get("log_prob") for r in recs]
-    seq_lens = [r.get("sequence_length", 0) for r in recs]
-    methods = [r.get("method", "evo2") for r in recs]
-    colors = [_evo2_color(lp) for lp in mean_lps]
-
-    y = np.arange(len(ids))
-
-    # Plot negative values as positive bars for readability (annotate true value)
-    abs_vals = [abs(v) for v in mean_lps]
-
-    bars = ax.barh(y, abs_vals, color=colors, height=0.5,
-                   edgecolor="white", linewidth=0.5, zorder=3)
-    ax.set_yticks(y)
-    ax.set_yticklabels(ids, fontfamily="monospace", fontsize=8)
-    ax.set_xlabel("| mean log-prob / nt |")
-    ax.invert_yaxis()
-    ax.set_title("(b) Evo2 DNA Quality Score", loc="left",
-                 fontweight="bold", pad=8)
-
-    # Quality thresholds
-    ax.axvline(x=0.3, color=_EVO2_GOOD, linestyle=":", linewidth=0.8, alpha=0.8)
-    ax.axvline(x=0.5, color=_EVO2_POOR, linestyle=":", linewidth=0.8, alpha=0.8)
-
-    # Annotations
-    for bar, mlp, tlp, sl, method in zip(bars, mean_lps, total_lps, seq_lens, methods):
-        method_label = {"evo2": "Evo2", "evo2_truncated": "Evo2*"}.get(method, method)
-        total_str = f"{tlp:.1f}" if tlp is not None else "N/A"
-        ax.text(bar.get_width() + 0.01,
-                bar.get_y() + bar.get_height() / 2,
-                f"{mlp:.4f}/nt  ({method_label}, {sl} bp)",
-                va="center", fontsize=7.5, color=_BLACK)
-
-    # Legend
-    tier_patches = [
-        mpatches.Patch(color=_EVO2_GOOD, label="Good (> −0.3)"),
-        mpatches.Patch(color=_EVO2_OK, label="Acceptable (−0.3 to −0.5)"),
-        mpatches.Patch(color=_EVO2_POOR, label="Poor (< −0.5)"),
-    ]
-    ax.legend(handles=tier_patches, loc="lower right", fontsize=6,
-              title="Mean log-prob quality", title_fontsize=6)
-
 
 # ── Panel C: Expression cassette architecture ────────────────────────
 
@@ -292,8 +159,12 @@ def _panel_cassette(ax: plt.Axes, summary: dict) -> None:
     ax.set_yticks(y)
     ax.set_yticklabels(ids, fontfamily="monospace", fontsize=8)
     ax.set_xlabel("Cassette length (bp)")
-    ax.invert_yaxis()
-    ax.set_title("(c) Expression Cassette Architecture", loc="left",
+    
+    # Invert and squash y-axis (min height to prevent large stretching for single chains)
+    min_rows_to_render = 2
+    ax.set_ylim(max(len(ids), min_rows_to_render) - 0.5, -0.5)
+    
+    ax.set_title("(a) Expression Cassette Architecture", loc="left",
                  fontweight="bold", pad=8)
 
     # Legend
@@ -350,7 +221,7 @@ def _panel_plasmid(ax: plt.Axes, summary: dict) -> None:
     ax.legend(wedges, ring_labels, loc="lower center", ncol=1,
               bbox_to_anchor=(0.5, -0.12), fontsize=7)
 
-    title = f"(d) Plasmid: {vector}"
+    title = f"(b) Plasmid: {vector}"
     if chain_id:
         title += f" :: {chain_id}"
     ax.set_title(title, loc="left", fontweight="bold", pad=10, fontsize=10)
@@ -449,7 +320,7 @@ def _panel_overview(ax: plt.Axes, summary: dict) -> None:
     ax.set_yticks(y)
     ax.set_yticklabels(labels, fontfamily="serif", fontsize=10)
     ax.invert_yaxis()
-    ax.set_title("(e) Key Quality Metrics", loc="left", fontweight="bold", pad=12)
+    ax.set_title("(c) Key Quality Metrics", loc="left", fontweight="bold", pad=12)
 
     handles = [
         mpatches.Patch(color=_LTGREY, label="Full range"),
@@ -465,33 +336,24 @@ def _build_combined_figure(summary: dict, out: Path) -> Path:
     """Create a single multi-panel figure combining all visualisations.
 
     Layout (2 rows × 2 cols):
-        Row 0:  (a) Validation checks     |  (b) Evo2 DNA quality
-        Row 1:  (c) Cassette architecture  |  (d) Plasmid construct
-        Row 2:  (e) Key metrics overview   |  (Empty)
+        Row 0:  (a) Cassette architecture  |  (b) Plasmid construct
+        Row 1:  (c) Key metrics overview   |  (Empty)
     """
     _apply_theme()
 
-    fig = plt.figure(figsize=(14, 12))
-    gs = gridspec.GridSpec(3, 2, figure=fig, hspace=0.38, wspace=0.30)
+    fig = plt.figure(figsize=(14, 8))
+    gs = gridspec.GridSpec(2, 2, figure=fig, hspace=0.38, wspace=0.30)
 
-    # (a) Validation checks
-    ax_val = fig.add_subplot(gs[0, 0])
-    _panel_validation(ax_val, summary)
-
-    # (b) Evo2 DNA quality
-    ax_evo2 = fig.add_subplot(gs[0, 1])
-    _panel_evo2(ax_evo2, summary)
-
-    # (c) Cassette architecture
-    ax_cass = fig.add_subplot(gs[1, 0])
+    # (a) Cassette architecture
+    ax_cass = fig.add_subplot(gs[0, 0])
     _panel_cassette(ax_cass, summary)
 
-    # (d) Plasmid
-    ax_plasm = fig.add_subplot(gs[1, 1])
+    # (b) Plasmid
+    ax_plasm = fig.add_subplot(gs[0, 1])
     _panel_plasmid(ax_plasm, summary)
 
-    # (e) Overview gauges
-    ax_over = fig.add_subplot(gs[2, 0])
+    # (c) Overview gauges
+    ax_over = fig.add_subplot(gs[1, 0])
     _panel_overview(ax_over, summary)
 
     # Suptitle
@@ -517,30 +379,6 @@ def _save_individual(summary: dict, out: Path) -> list[Path]:
     """Save each panel as a standalone figure."""
     _apply_theme()
     paths: list[Path] = []
-
-    # Validation
-    chains = summary.get("chains", [])
-    rows = _extract_numeric_checks(chains)
-    if rows:
-        fig, ax = plt.subplots(figsize=(7, max(2.5, len(rows) * 0.6)))
-        _panel_validation(ax, summary)
-        fig.tight_layout()
-        p = out / "validation_checks.png"
-        fig.savefig(p, dpi=_DPI)
-        plt.close(fig)
-        paths.append(p)
-
-    # Evo2 DNA quality
-    struct = summary.get("structure_report", [])
-    has_evo2 = any(s.get("mean_log_prob") is not None for s in struct)
-    if struct and has_evo2:
-        fig, ax = plt.subplots(figsize=(7, max(2.5, len(struct) * 0.8 + 1)))
-        _panel_evo2(ax, summary)
-        fig.tight_layout()
-        p = out / "evo2_quality.png"
-        fig.savefig(p, dpi=_DPI)
-        plt.close(fig)
-        paths.append(p)
 
     # Cassette architecture
     plasmids = summary.get("plasmids", [])

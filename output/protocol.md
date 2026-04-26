@@ -1,93 +1,72 @@
-# Protocol: Human Proinsulin Expression and Purification in *E. coli*
+# Protocol: Insulin (Proinsulin) Expression and Purification in *E. coli*
 
 ## Literature Context
-Human insulin was the first recombinant therapeutic protein produced in *E. coli* (PMID:33340315). Early work expressed the A and B chains separately as β-galactosidase fusions, then combined and re‑oxidised to form active insulin (PMID:85300). Modern processes typically express proinsulin in *E. coli* as inclusion bodies, followed by denaturing purification and oxidative refolding (PMID:25270715). The target solubility score (0.594) predicts moderate-to-high solubility, but the presence of six cysteines (disulfide risk = True) mandates oxidative refolding to obtain the correct three disulfide bonds (PMID:25270715, PMID:38479588). A new *E. coli* strain engineered for insulin production has been described (PMID:30735706), but we use the standard BL21(DE3)/pET‑28a system.
+Human insulin is a therapeutic protein historically produced in *E. coli* via separate expression of A and B chains followed by chemical combination (PMID:85300). Modern approaches often express proinsulin as a single chain, requiring oxidative refolding to form three disulfide bonds (Cys⁶–Cys¹¹, Cys⁷–Cys⁷, Cys²⁰–Cys¹⁹). The *E. coli* host is cost‑effective but lacks the eukaryotic machinery for disulfide bond formation; therefore, denaturing purification and controlled refolding are essential (PMID:38479588, PMID:25270715). The pET‑28a(+) vector with an N‑terminal 6×His tag and enterokinase cleavage site enables IMAC purification and tag removal. The predicted solubility score (0.594) suggests good intrinsic solubility, but the presence of six cysteines (disulfide risk = True) mandates an inclusion body refolding strategy to obtain correctly folded, bioactive insulin (PMID:30735706).
 
 ## 1. Strains, Plasmid, and Safety Notes
-- **Host strain**: *E. coli* BL21(DE3) (Novagen) – contains T7 RNA polymerase under lacUV5 control.
-- **Plasmid**: pET‑28a(+) encoding the 86‑aa human proinsulin (UniProt P01308, residues 25–110) with an N‑terminal 6×His‑tag followed by an Enterokinase (EK) recognition site (DDDDK). Cloning sites: *BamHI* (5′) and *XhoI* (3′).
-- **Resistance marker**: Kanamycin (50 µg/mL final).
-- **Safety**: Standard BSL‑1 practices. Use PPE when handling IPTG and guanidine hydrochloride. Ni‑NTA resin is an irritant.
+- **Host strain**: *E. coli* BL21(DE3) (or derivative, e.g., BL21‑CodonPlus‑RIL for rare codon supplementation if needed; here CAI = 0.89, so not required).
+- **Plasmid**: pET‑28a(+) encoding human proinsulin (86 aa) with N‑terminal 6×His tag followed by an enterokinase recognition site (DDDDK). Cloning sites: *BamHI* (5′) and *XhoI* (3′). Kanamycin resistance (50 µg/mL).
+- **Safety**: *E. coli* BL21(DE3) is BSL‑1. Use standard aseptic technique. Denaturing agents (urea, guanidine‑HCl) and reducing agents (DTT, β‑mercaptoethanol) are irritants; work in a fume hood.
 
 ## 2. Transformation
-1. Thaw 50 µL of chemically competent BL21(DE3) cells on ice.
-2. Add 1–5 ng (1 µL) of plasmid DNA. Mix gently, incubate on ice 30 min.
-3. Heat‑shock at 42 °C for 45 s, then place on ice 2 min.
-4. Add 450 µL LB medium (no antibiotic). Incubate 1 h at 37 °C, 200 rpm.
-5. Spread 50–100 µL on LB agar containing 50 µg/mL kanamycin. Incubate 16 h at 37 °C.
-6. Pick a single colony for pre‑culture.
+1. Thaw 50 µL of chemically competent BL21(DE3) cells on ice.
+2. Add 1–2 µL (≈50 ng) of plasmid DNA, mix gently, incubate on ice for 30 min.
+3. Heat‑shock at 42°C for 45 s, then place on ice for 2 min.
+4. Add 950 µL of LB medium (no antibiotic) and incubate at 37°C, 220 rpm for 1 h.
+5. Spread 100 µL on LB agar plates containing 50 µg/mL kanamycin. Incubate at 37°C overnight (16–18 h).
 
 ## 3. Pre‑culture
-1. Inoculate 20 mL LB (50 µg/mL kanamycin) in a 100 mL flask with one colony.
-2. Incubate at 37 °C, 200 rpm for 12–16 h (overnight) until OD₆₀₀ ≈ 2.0–3.0.
-3. Use this pre‑culture to inoculate the expression culture at 1:100 dilution.
+1. Inoculate a single colony into 5 mL of LB medium + 50 µg/mL kanamycin in a 15 mL tube.
+2. Incubate at 37°C, 220 rpm for 12–16 h (overnight) until OD₆₀₀ ≈ 2–3.
 
 ## 4. Expression Culture and Induction
-- *Solubility score 0.594, disulfide risk True – use standard inclusion body conditions to maximise yield; refolding will follow.*
-
-1. Inoculate 1 L LB (50 µg/mL kanamycin) in a 2.5 L baffled flask with 10 mL pre‑culture.
-2. Incubate at 37 °C, 200 rpm until OD₆₀₀ reaches 0.6–0.8.
-3. Add IPTG to a final concentration of **1.0 mM** (stock: 1 M in water, sterile‑filtered).
-4. Continue incubation at **37 °C** for **4 h** with shaking (200 rpm).
-5. For borderline solubility, an alternative low‑temperature induction (25 °C, 6 h, 0.2 mM IPTG) may be used, but the present protocol favours high inclusion body yield.
+- **Induction conditions**: Because the solubility score is >0.45 but disulfide risk is high, we aim for high‑level expression as inclusion bodies. Use 1.0 mM IPTG at 37°C for 4 h (PMID:30735706).
+1. Inoculate 1 L of LB medium (or TB for higher density) + 50 µg/mL kanamycin with 10 mL of pre‑culture (1% v/v).
+2. Grow at 37°C, 220 rpm until OD₆₀₀ reaches 0.6–0.8.
+3. Add IPTG to a final concentration of 1.0 mM.
+4. Continue incubation at 37°C, 220 rpm for 4 h.
+5. Harvest cells by centrifugation at 6,000 × g, 4°C, 15 min. Discard supernatant. Cell pellet can be stored at –80°C.
 
 ## 5. Cell Harvest and Lysis
-- **Denaturing lysis is required** (warning: 6 cysteine residues; cytoplasmic disulfide formation is inefficient) (PMID:38479588).
+- **Denaturing lysis** is required because the protein will be in inclusion bodies (warnings).
+1. Resuspend cell pellet in 30 mL of **Lysis Buffer** (50 mM Tris‑HCl pH 8.0, 300 mM NaCl, 8 M urea, 10 mM imidazole, 5 mM β‑mercaptoethanol). Use a homogeniser or magnetic stirrer.
+2. Stir at room temperature for 1 h to fully solubilise inclusion bodies.
+3. Centrifuge at 20,000 × g, 4°C, 30 min. Retain the supernatant (clarified lysate). Filter through a 0.45 µm syringe filter.
 
-1. Harvest cells by centrifugation at 6,000 × g, 4 °C, 15 min.
-2. Wash pellet with 100 mL ice‑cold PBS (pH 7.4). Centrifuge again.
-3. Resuspend pellet in **Denaturing Lysis Buffer** (6 M guanidine‑HCl, 20 mM Tris‑HCl pH 8.0, 500 mM NaCl, 20 mM imidazole) at 10 mL per gram wet pellet.
-4. Stir at room temperature for 1 h (or until homogeneous). Optionally sonicate (6 × 10 s pulses, 30 % amplitude) to reduce viscosity.
-5. Clarify lysate by centrifugation at 20,000 × g, 4 °C, 30 min. Keep supernatant (contains solubilised proinsulin).
-
-## 6. Affinity Purification (IMAC) under Denaturing Conditions
-1. Equilibrate 5 mL Ni‑NTA agarose (Qiagen) with **Denaturing Lysis Buffer** (10 column volumes, CV).
-2. Load clarified lysate onto column at 1 mL/min.
-3. Wash with 20 CV of **Wash Buffer** (6 M guanidine‑HCl, 20 mM Tris‑HCl pH 8.0, 500 mM NaCl, 50 mM imidazole).
-4. Elute with **Elution Buffer** (6 M guanidine‑HCl, 20 mM Tris‑HCl pH 8.0, 500 mM NaCl, 500 mM imidazole). Collect 1 mL fractions.
-5. Pool fractions with A₂₈₀ > 0.1. Analyse by SDS‑PAGE (expected ~13 kDa including tag).
+## 6. Affinity Purification (IMAC)
+- All steps at room temperature under denaturing conditions.
+1. Equilibrate 5 mL of Ni‑NTA agarose resin (e.g., Qiagen) with **Equilibration Buffer** (50 mM Tris‑HCl pH 8.0, 300 mM NaCl, 8 M urea, 10 mM imidazole).
+2. Load clarified lysate onto the column at a flow rate of 1 mL/min.
+3. Wash with 10 column volumes (CV) of **Wash Buffer** (50 mM Tris‑HCl pH 8.0, 300 mM NaCl, 8 M urea, 20 mM imidazole).
+4. Elute with **Elution Buffer** (50 mM Tris‑HCl pH 8.0, 300 mM NaCl, 8 M urea, 250 mM imidazole). Collect 1 mL fractions. Monitor A₂₈₀.
+5. Pool fractions containing proinsulin (typically fractions 2–5). Check purity by SDS‑PAGE (Coomassie stain).
 
 ## 7. Tag Removal
-The 6×His‑tag is cleaved by Enterokinase after refolding (EK cleaves the sequence DDDDK†). Cleavage before refolding may expose hydrophobic surfaces and reduce yields. Therefore tag removal is performed **after refolding** (Section 8).
-
-After refolding (Section 8), proceed:
-1. Adjust refolded protein buffer to 20 mM Tris‑HCl pH 8.0, 50 mM NaCl, 2 mM CaCl₂. Do not include EDTA.
-2. Add Enterokinase (EK) at a 1:100 (w/w) enzyme‑to‑substrate ratio.
-3. Incubate at 16 °C for 16 h (or room temperature for 4 h). Confirm cleavage by SDS‑PAGE (shift from ~13 kDa to ~10 kDa).
-4. Remove EK and uncleaved protein by passing through a 1 mL Ni‑NTA column (equilibrated in 20 mM Tris pH 8.0, 50 mM NaCl). Flow‑through contains tag‑free proinsulin.
-5. Concentrate to ~1 mg/mL using a 3 kDa MWCO centrifugal filter.
+- The 6×His tag is removed by enterokinase cleavage after refolding (to avoid interference). Perform after refolding (Section 8). Alternatively, cleave under denaturing conditions if the tag interferes with refolding; here we recommend post‑refolding.
+1. After refolding (Section 8), dialyse the refolded protein into **Cleavage Buffer** (50 mM Tris‑HCl pH 8.0, 100 mM NaCl, 2 mM CaCl₂).
+2. Add enterokinase (e.g., New England Biolabs) at 1 U per 50 µg of fusion protein. Incubate at 25°C for 16 h.
+3. Remove uncleaved protein and enterokinase by passing through a second Ni‑NTA column (flow‑through contains cleaved proinsulin). Wash with 2 CV of cleavage buffer.
+4. Concentrate the flow‑through using a 3 kDa MWCO centrifugal filter.
 
 ## 8. Inclusion Body Refolding
-- **Required because disulfide_risk = True** (6 cysteines must form three correct disulfide bonds).
-
-### 8.1. On‑column refolding (preferred) 
-1. After IMAC elution (Step 6), dilute the pooled eluate to 0.5–1 mg/mL protein in **Denaturing Refolding Buffer** (6 M urea, 20 mM Tris‑HCl pH 8.5, 500 mM NaCl, 1 mM reduced glutathione (GSH), 0.1 mM oxidised glutathione (GSSG), 0.5 M arginine).
-2. Load onto a fresh Ni‑NTA column (equilibrated with the same buffer).
-3. Wash with 5 CV of **Refolding Buffer** containing decreasing urea gradient (6 M → 2 M urea, stepwise 2 M per wash, 3 CV each).
-4. Wash with 5 CV of **Final Refolding Buffer** (2 M urea, 20 mM Tris‑HCl pH 8.5, 500 mM NaCl, 1 mM GSH, 0.1 mM GSSG, 0.5 M arginine).
-5. Incubate on‑column at 4 °C for 12–16 h.
-6. Elute with **Elution Buffer** (same as step 4, but urea‑free: 20 mM Tris‑HCl pH 8.0, 500 mM NaCl, 500 mM imidazole). Collect fractions.
-
-### 8.2. Alternative: dialysis refolding
-1. Dialyse IMAC eluate (diluted to 0.2–0.5 mg/mL) against **Refolding Buffer** (without urea) containing 1 mM GSH, 0.1 mM GSSG, 0.5 M arginine, 20 mM Tris‑HCl pH 8.5, 50 mM NaCl. Use stepwise dialysis: 4 M urea → 2 M urea → 0 M urea, each step 4 h at 4 °C.
-2. Oxidative refolding occurs during the final dialysis (18 h at 4 °C).
-
-### 8.3. Post‑refolding cleanup
-- Centrifuge refolded sample at 20,000 × g, 4 °C, 20 min to remove aggregates.
-- Proceed to **Tag Removal** (Section 7) or directly to quality control.
+- **Rationale**: Six cysteines require oxidative refolding to form the three native disulfide bonds (CysA6–CysA11, CysA7–CysB7, CysA20–CysB19). The refolding protocol is adapted from classical insulin refolding (PMID:85300, PMID:25270715).
+1. **Prepare refolding buffer**: 50 mM Tris‑HCl pH 8.5, 0.5 M L‑arginine (to suppress aggregation), 2 mM reduced glutathione (GSH), 0.2 mM oxidised glutathione (GSSG) (redox ratio 10:1), 1 mM EDTA.
+2. Dilute the purified denatured proinsulin (in 8 M urea) dropwise into refolding buffer at 4°C with gentle stirring to a final protein concentration of 0.1–0.2 mg/mL. Avoid exceeding 0.2 mg/mL to minimise aggregation.
+3. Incubate at 4°C for 24–48 h without stirring.
+4. Monitor refolding by reverse‑phase HPLC or by measuring thiol groups (Ellman’s assay). The formation of disulfide bonds can be confirmed by a shift in retention time or by mass spectrometry.
+5. After refolding, dialyse against 20 mM Tris‑HCl pH 8.0, 100 mM NaCl to remove arginine and glutathione.
+6. Centrifuge at 20,000 × g, 4°C, 30 min to remove any precipitate. Retain supernatant.
 
 ## 9. Quality Control
-1. **SDS‑PAGE** (15 % gel) under reducing and non‑reducing conditions. Expected mass: tag‑free proinsulin ~10 kDa. Non‑reducing band should be monomeric (no disulfide‑linked oligomers).
-2. **Western blot** using anti‑insulin antibody (e.g., mouse monoclonal, 1:1000) to confirm identity.
-3. **Analytical RP‑HPLC** (C18 column, 0.1 % TFA, acetonitrile gradient) – proinsulin elutes as a sharp peak; presence of isomers indicates misfolding.
-4. **Mass spectrometry** (ESI‑MS) – expected mass 9393 Da (proinsulin without tag). Deviation > 1 Da suggests incomplete disulfide formation.
-5. **Disulfide mapping** (peptide mapping with trypsin, LC‑MS/MS) to verify three disulfide bonds (Cys⁶–Cys¹¹, Cys⁷–Cys⁷?, actually human insulin: A6–A11, A7–B7, A20–B19; for proinsulin check appropriate residues).
+1. **SDS‑PAGE** (reducing and non‑reducing): Compare mobility. Correctly folded proinsulin should show a slightly faster migration under non‑reducing conditions due to compact structure.
+2. **Mass spectrometry**: Expected mass of proinsulin (86 aa) ≈ 9.4 kDa; after tag removal ≈ 8.8 kDa. Confirm intact mass and disulfide bond formation (mass shift of –6 Da for three disulfides).
+3. **Reverse‑phase HPLC**: Use a C18 column with a gradient of 20–60% acetonitrile in 0.1% TFA. Native proinsulin elutes earlier than the reduced form.
+4. **Bioactivity assay** (optional): Insulin receptor binding or glucose uptake assay in adipocytes.
 
 ## 10. Expected Yields and Troubleshooting Tips
-- **Expected yield**: 20–50 mg of purified proinsulin per litre of culture after refolding and cleavage. Recovery from inclusion bodies is typically 10–30 % of total expressed protein.
-- **Low refolding yield**: Optimise the GSH:GSSG ratio (commonly 10:1 to 3:1). Increase arginine to 0.8 M. Lower protein concentration during refolding (< 0.5 mg/mL).
-- **Aggregation after cleavage**: Add 0.1 % Tween‑20 or increase NaCl to 300 mM. Perform cleavage at 4 °C.
-- **Proteolytic degradation**: Include 1 mM PMSF during lysis; use protease‑inhibitor cocktail. Ensure all buffers are ice‑cold.
-- **Incomplete tag cleavage**: Increase EK amount or incubation time. Check Ca²⁺ concentration (2 mM required).
-- **Expression**: If no induction observed, sequence the plasmid; ensure correct reading frame. Can co‑express GroEL/GroES (pGro7) to reduce aggregation (optional, not mandatory for inclusion body route).
-- **Note**: To obtain mature insulin, the C‑peptide must be enzymatically removed from proinsulin (e.g., trypsin and carboxypeptidase B). This step is **not** included in the present protocol.
+- **Expected yield**: 10–30 mg of purified proinsulin per litre of culture (after refolding). Final recovery after tag cleavage and polishing may be 5–15 mg/L.
+- **Low solubility after refolding**: Reduce protein concentration during refolding to ≤0.1 mg/mL; increase L‑arginine to 1 M; adjust redox ratio (try GSH:GSSG = 5:1 to 20:1).
+- **Incomplete disulfide formation**: Extend refolding time to 72 h; add a redox shuffling step (e.g., 0.5 mM DTT for 1 h then removal).
+- **Tag cleavage inefficiency**: Ensure Ca²⁺ is present; increase enterokinase amount or incubation time; remove imidazole completely by dialysis.
+- **Aggregation during IMAC**: Keep urea concentration at 8 M throughout; do not reduce imidazole below 10 mM in wash steps.
+- **Co‑expression of chaperones**: Not required here because we are using inclusion body route; if soluble expression is desired, co‑express GroEL/GroES (PMID:38479588), but for disulfide‑rich proteins the refolding route is more reliable.
