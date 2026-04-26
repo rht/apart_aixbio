@@ -5,6 +5,9 @@ import json
 import sys
 from pathlib import Path
 
+from aixbio.tools.output_card import generate_output_card
+from aixbio.tools.visualizations import generate_visualizations
+
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -296,9 +299,34 @@ def _write_artifacts(result: dict, compound_id: str, output_dir: str):
             },
         }
 
-    json_path = out / f"{compound_id}_summary.json"
-    json_path.write_text(json.dumps(summary, indent=2, default=str))
-    print(f"  Wrote {json_path}")
+    # Structure report (from optional --structural flag)
+    structure = result.get("structure_report")
+    if structure:
+        summary["structure_report"] = [
+            {
+                "chain_id": sr.id,
+                "plddt_mean": sr.plddt_mean,
+                "rmsd_to_ref": sr.rmsd_to_ref,
+                "perplexity": sr.perplexity,
+                "structure_file": sr.structure_file,
+                "method": sr.method,
+            }
+            for sr in structure.chains
+        ]
+
+    # Plasmid metadata for each chain
+    summary["plasmids"] = []
+    for cr in chain_results:
+        if cr.get("genbank_file"):
+            from aixbio.tools.genbank import PET28A_BACKBONE_SIZE
+            summary["plasmids"].append({
+                "chain_id": cr["chain_id"],
+                "vector": result.get("vector", DEFAULT_VECTOR),
+                "cloning_sites": list(result.get("cloning_sites", DEFAULT_CLONING_SITES)),
+                "insert_size": cr["insert_size"],
+                "backbone_size": PET28A_BACKBONE_SIZE,
+                "total_size": PET28A_BACKBONE_SIZE + cr["insert_size"],
+            })
 
     protocol = result.get("protocol")
     if protocol:
@@ -320,7 +348,7 @@ def _write_artifacts(result: dict, compound_id: str, output_dir: str):
         report_path.write_text(format_quotes_text(synthesis_quotes))
         print(f"  Wrote {report_path}")
 
-        # Embed compact summary in JSON
+        # Embed compact synthesis summary so JSON and card both include it
         summary["synthesis_quotes"] = [
             {
                 "chain_id": q.chain_id,
@@ -353,6 +381,20 @@ def _write_artifacts(result: dict, compound_id: str, output_dir: str):
                 tsv_path = out / f"{safe_id}_peptides.tsv"
                 tsv_path.write_text(format_tsv(rows))
                 print(f"  Wrote {tsv_path} ({len(rows)} tryptic peptides)")
+
+    # Write the complete JSON summary (after synthesis_quotes have been appended)
+    json_path = out / f"{compound_id}_summary.json"
+    json_path.write_text(json.dumps(summary, indent=2, default=str))
+    print(f"  Wrote {json_path}")
+
+    # Generate the HTML output card from the fully-populated summary
+    card_path = generate_output_card(summary, out)
+    print(f"  Wrote {card_path}")
+
+    # Generate matplotlib visualizations into output/visualizations/
+    viz_paths = generate_visualizations(summary, out)
+    for vp in viz_paths:
+        print(f"  Wrote {vp}")
 
     print(f"\nAll artifacts written to {out}/")
 

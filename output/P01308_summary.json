@@ -89,5 +89,56 @@
       "disulfide_risk": true,
       "max_gravy": -0.102
     }
-  }
+  },
+  "structure_report": [
+    {
+      "chain_id": "Insulin_P01308",
+      "plddt_mean": 0.53,
+      "rmsd_to_ref": 4.027,
+      "perplexity": null,
+      "structure_file": "output/structures/esm_Insulin_P01308.pdb",
+      "method": "esmfold"
+    }
+  ],
+  "plasmids": [
+    {
+      "chain_id": "Insulin_P01308",
+      "vector": "pET-28a(+)",
+      "cloning_sites": [
+        "BamHI",
+        "XhoI"
+      ],
+      "insert_size": 312,
+      "backbone_size": 5369,
+      "total_size": 5681
+    }
+  ],
+  "synthesis_quotes": [
+    {
+      "chain_id": "Insulin_P01308",
+      "insert_length": 312,
+      "gc_content": 0.538,
+      "longest_homopolymer": 4,
+      "vendors": [
+        {
+          "vendor": "IDT",
+          "feasible": true,
+          "estimated_cost_usd": 95.0,
+          "estimated_turnaround": "10\u201315 business days",
+          "rejection_flags": [],
+          "notes": [
+            "Expedited synthesis available (3\u20135 business days, additional cost)."
+          ]
+        },
+        {
+          "vendor": "Twist",
+          "feasible": true,
+          "estimated_cost_usd": 99.0,
+          "estimated_turnaround": "10\u201314 business days",
+          "rejection_flags": [],
+          "notes": []
+        }
+      ]
+    }
+  ]
 }

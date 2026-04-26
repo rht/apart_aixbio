@@ -17,6 +17,8 @@ def generate_output_card(summary: dict, output_dir: str | Path) -> Path:
     chains = summary.get("chains", [])
     warnings = summary.get("warnings", [])
     synthesis = summary.get("synthesis_quotes", [])
+    structure_chains = summary.get("structure_report", [])
+    plasmids = summary.get("plasmids", [])
 
     timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
 
@@ -106,6 +108,115 @@ def generate_output_card(summary: dict, output_dir: str | Path) -> Path:
             </div>
             {"<ul class='caveats'>" + caveats_html + "</ul>" if caveats_html else ""}
           </div>
+        </div>"""
+
+    # ── Structure Report Section ──────────────────────────────────────
+    structure_html = ""
+    if structure_chains:
+        struct_rows = ""
+        for sr in structure_chains:
+            sr_id = html.escape(str(sr.get("chain_id", "")))
+            plddt = sr.get("plddt_mean", 0)
+            rmsd = sr.get("rmsd_to_ref")
+            method = sr.get("method", "unknown")
+            struct_file = sr.get("structure_file", "")
+            perplexity = sr.get("perplexity")
+
+            # pLDDT confidence colour
+            if plddt >= 90:
+                plddt_color = "#16a34a"
+                plddt_label = "Very high"
+            elif plddt >= 70:
+                plddt_color = "#2563eb"
+                plddt_label = "Confident"
+            elif plddt >= 50:
+                plddt_color = "#f59e0b"
+                plddt_label = "Low"
+            else:
+                plddt_color = "#dc2626"
+                plddt_label = "Very low"
+
+            plddt_pct = min(round(plddt), 100)
+
+            # Method badge
+            method_labels = {
+                "esmfold": ("ESMFold", "#8b5cf6"),
+                "afdb": ("AlphaFold DB", "#2563eb"),
+                "afdb_fallback": ("AFDB (fallback)", "#f59e0b"),
+            }
+            m_label, m_color = method_labels.get(method, (method.upper(), "#64748b"))
+
+            rmsd_str = f"{rmsd:.3f} Å" if rmsd is not None else "N/A"
+            perp_str = f"{perplexity:.2f}" if perplexity is not None else "—"
+            file_name = html.escape(Path(struct_file).name) if struct_file else "—"
+
+            struct_rows += f"""
+            <div class="struct-chain-card">
+              <div class="struct-chain-header">
+                <span class="chain-id">{sr_id}</span>
+                <span class="status-badge-sm" style="background:{m_color}">{m_label}</span>
+              </div>
+              <div class="struct-metrics">
+                <div class="struct-metric">
+                  <span class="metric-label">pLDDT</span>
+                  <div class="bar-track"><div class="bar-fill" style="width:{plddt_pct}%;background:{plddt_color}"></div></div>
+                  <span class="metric-value">{plddt:.1f} &mdash; {plddt_label}</span>
+                </div>
+                <div class="struct-stats-row">
+                  <div class="struct-stat"><span class="struct-stat-label">RMSD</span><span class="struct-stat-val">{rmsd_str}</span></div>
+                  <div class="struct-stat"><span class="struct-stat-label">Perplexity</span><span class="struct-stat-val">{perp_str}</span></div>
+                  <div class="struct-stat"><span class="struct-stat-label">File</span><span class="struct-stat-val file-mono">{file_name}</span></div>
+                </div>
+              </div>
+            </div>"""
+
+        structure_html = f"""
+        <div class="section">
+          <h2>Structural Validation</h2>
+          {struct_rows}
+        </div>"""
+
+    # ── Plasmid Map Section ───────────────────────────────────────────
+    plasmid_html = ""
+    if plasmids:
+        plasmid_cards = ""
+        for pm in plasmids:
+            pm_chain = html.escape(pm.get("chain_id", ""))
+            pm_vector = html.escape(pm.get("vector", ""))
+            pm_sites = pm.get("cloning_sites", [])
+            pm_insert = pm.get("insert_size", 0)
+            pm_backbone = pm.get("backbone_size", 0)
+            pm_total = pm.get("total_size", 0)
+            sites_str = " / ".join(html.escape(s) for s in pm_sites) if pm_sites else "—"
+
+            # Percentage for the SVG ring
+            insert_pct = (pm_insert / pm_total * 100) if pm_total else 0
+            backbone_pct = 100 - insert_pct
+
+            # SVG circular plasmid map
+            # Ring: backbone (blue) + insert (green), labels on top
+            svg = _build_plasmid_svg(pm_vector, pm_chain, pm_insert, pm_backbone, pm_total, pm_sites)
+
+            plasmid_cards += f"""
+            <div class="plasmid-card">
+              <div class="plasmid-visual">
+                {svg}
+              </div>
+              <div class="plasmid-info">
+                <div class="plasmid-title">{pm_vector} :: {pm_chain}</div>
+                <div class="plasmid-detail-grid">
+                  <div class="plasmid-detail"><span class="pd-label">Total size</span><span class="pd-value">{pm_total:,} bp</span></div>
+                  <div class="plasmid-detail"><span class="pd-label">Backbone</span><span class="pd-value">{pm_backbone:,} bp</span></div>
+                  <div class="plasmid-detail"><span class="pd-label">Insert</span><span class="pd-value">{pm_insert:,} bp</span></div>
+                  <div class="plasmid-detail"><span class="pd-label">Cloning sites</span><span class="pd-value">{sites_str}</span></div>
+                </div>
+              </div>
+            </div>"""
+
+        plasmid_html = f"""
+        <div class="section">
+          <h2>Plasmid Constructs</h2>
+          {plasmid_cards}
         </div>"""
 
     synthesis_html = ""
@@ -231,6 +342,29 @@ def generate_output_card(summary: dict, output_dir: str | Path) -> Path:
   .caveats li {{ font-size: 13px; color: var(--amber); padding: 4px 0; }}
   .caveats li::before {{ content: '!'; display: inline-block; width: 18px; height: 18px; line-height: 18px; text-align: center; background: rgba(245,158,11,0.15); border-radius: 4px; font-size: 11px; font-weight: 700; margin-right: 8px; }}
 
+  /* ── Structure Report ─────────────────────────────── */
+  .struct-chain-card {{ background: var(--bg); border: 1px solid var(--surface2); border-radius: 8px; padding: 16px; margin-bottom: 12px; }}
+  .struct-chain-card:last-child {{ margin-bottom: 0; }}
+  .struct-chain-header {{ display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }}
+  .struct-metrics {{ display: flex; flex-direction: column; gap: 10px; }}
+  .struct-stats-row {{ display: flex; gap: 24px; flex-wrap: wrap; }}
+  .struct-stat {{ display: flex; flex-direction: column; gap: 2px; }}
+  .struct-stat-label {{ font-size: 11px; color: var(--text2); text-transform: uppercase; letter-spacing: 0.5px; }}
+  .struct-stat-val {{ font-size: 14px; font-weight: 600; font-family: monospace; }}
+  .file-mono {{ font-size: 12px; font-weight: 400; color: var(--accent); }}
+
+  /* ── Plasmid Constructs ───────────────────────────── */
+  .plasmid-card {{ display: flex; align-items: center; gap: 24px; background: var(--bg); border: 1px solid var(--surface2); border-radius: 8px; padding: 20px; margin-bottom: 12px; flex-wrap: wrap; }}
+  .plasmid-card:last-child {{ margin-bottom: 0; }}
+  .plasmid-visual {{ flex: 0 0 160px; display: flex; justify-content: center; }}
+  .plasmid-visual svg {{ width: 150px; height: 150px; }}
+  .plasmid-info {{ flex: 1; min-width: 220px; }}
+  .plasmid-title {{ font-size: 16px; font-weight: 600; margin-bottom: 12px; font-family: monospace; }}
+  .plasmid-detail-grid {{ display: grid; grid-template-columns: 1fr 1fr; gap: 8px 24px; }}
+  .plasmid-detail {{ display: flex; flex-direction: column; gap: 2px; }}
+  .pd-label {{ font-size: 11px; color: var(--text2); text-transform: uppercase; letter-spacing: 0.5px; }}
+  .pd-value {{ font-size: 14px; font-weight: 600; font-family: monospace; }}
+
   .synth-table {{ width: 100%; border-collapse: collapse; font-size: 13px; }}
   .synth-table th {{ text-align: left; color: var(--text2); font-weight: 500; padding: 8px 12px; border-bottom: 1px solid var(--surface2); }}
   .synth-table td {{ padding: 8px 12px; border-bottom: 1px solid rgba(51,65,85,0.5); }}
@@ -240,7 +374,7 @@ def generate_output_card(summary: dict, output_dir: str | Path) -> Path:
   .warnings-list {{ list-style: none; }}
   .warnings-list li {{ font-size: 13px; color: var(--amber); padding: 6px 0; border-bottom: 1px solid rgba(245,158,11,0.1); }}
   .warnings-list li:last-child {{ border-bottom: none; }}
-  .warnings-list li::before {{ content: '\\26A0'; margin-right: 8px; }}
+  .warnings-list li::before {{ content: '⚠'; margin-right: 8px; }}
 
   .file-grid {{ display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px; }}
   .file-item {{ display: flex; align-items: center; gap: 8px; background: var(--bg); border: 1px solid var(--surface2); border-radius: 8px; padding: 10px 12px; }}
@@ -256,6 +390,8 @@ def generate_output_card(summary: dict, output_dir: str | Path) -> Path:
     .protein-name {{ font-size: 22px; }}
     .chain-stats {{ gap: 16px; }}
     .stat-val {{ font-size: 20px; }}
+    .plasmid-card {{ flex-direction: column; }}
+    .plasmid-visual {{ flex: none; }}
   }}
 </style>
 </head>
@@ -275,6 +411,8 @@ def generate_output_card(summary: dict, output_dir: str | Path) -> Path:
 
   {host_html}
   {chains_html}
+  {structure_html}
+  {plasmid_html}
   {synthesis_html}
   {warnings_html}
   {files_html}
@@ -289,6 +427,80 @@ def generate_output_card(summary: dict, output_dir: str | Path) -> Path:
     card_path = out / "output_card.html"
     card_path.write_text(card_html)
     return card_path
+
+
+def _build_plasmid_svg(
+    vector: str,
+    chain_id: str,
+    insert_bp: int,
+    backbone_bp: int,
+    total_bp: int,
+    cloning_sites: list[str],
+) -> str:
+    """Return an inline SVG showing a circular plasmid map with insert arc."""
+    import math
+
+    cx, cy, r = 75, 75, 55
+    stroke = 10
+
+    if total_bp == 0:
+        insert_frac = 0
+    else:
+        insert_frac = insert_bp / total_bp
+
+    # Insert arc starts at top (12 o'clock) going clockwise
+    insert_angle = insert_frac * 360
+    backbone_angle = 360 - insert_angle
+
+    def polar(angle_deg: float, radius: float = r) -> tuple[float, float]:
+        rad = math.radians(angle_deg - 90)  # -90 so 0° = top
+        return cx + radius * math.cos(rad), cy + radius * math.sin(rad)
+
+    # SVG arc path helper
+    def arc_path(start_deg: float, end_deg: float, color: str) -> str:
+        if abs(end_deg - start_deg) < 0.1:
+            return ""
+        sx, sy = polar(start_deg)
+        ex, ey = polar(end_deg)
+        large = 1 if (end_deg - start_deg) > 180 else 0
+        return (
+            f'<path d="M {sx:.1f} {sy:.1f} A {r} {r} 0 {large} 1 {ex:.1f} {ey:.1f}" '
+            f'fill="none" stroke="{color}" stroke-width="{stroke}" stroke-linecap="round"/>'
+        )
+
+    insert_arc = arc_path(0, insert_angle, "#16a34a")
+    backbone_arc = arc_path(insert_angle, 360, "#2563eb")
+
+    # Site markers at junction points
+    s1x, s1y = polar(0, r + 8)
+    s2x, s2y = polar(insert_angle, r + 8)
+    site_labels = ""
+    if cloning_sites:
+        site1 = html.escape(cloning_sites[0]) if len(cloning_sites) > 0 else ""
+        site2 = html.escape(cloning_sites[1]) if len(cloning_sites) > 1 else ""
+        site_labels = f"""
+        <text x="{s1x:.1f}" y="{s1y:.1f}" fill="#94a3b8" font-size="7" text-anchor="middle" font-family="monospace">{site1}</text>
+        <text x="{s2x:.1f}" y="{s2y:.1f}" fill="#94a3b8" font-size="7" text-anchor="middle" font-family="monospace">{site2}</text>"""
+
+    # Center label
+    center_label = f"""
+    <text x="{cx}" y="{cy - 6}" fill="#f1f5f9" font-size="9" text-anchor="middle" font-weight="600" font-family="system-ui">{total_bp:,}</text>
+    <text x="{cx}" y="{cy + 6}" fill="#94a3b8" font-size="7" text-anchor="middle" font-family="system-ui">bp</text>"""
+
+    # Legend dots
+    legend = f"""
+    <circle cx="10" cy="140" r="4" fill="#16a34a"/>
+    <text x="18" y="143" fill="#94a3b8" font-size="7" font-family="system-ui">Insert ({insert_bp:,} bp)</text>
+    <circle cx="10" cy="150" r="4" fill="#2563eb"/>
+    <text x="18" y="153" fill="#94a3b8" font-size="7" font-family="system-ui">Backbone ({backbone_bp:,} bp)</text>"""
+
+    return f"""<svg viewBox="0 0 150 160" xmlns="http://www.w3.org/2000/svg">
+      {backbone_arc}
+      {insert_arc}
+      {site_labels}
+      {center_label}
+      {legend}
+    </svg>"""
 
 
 def _file_icon(suffix: str) -> str:
