@@ -49,46 +49,46 @@ Main graph
 
 ```mermaid
 flowchart TD
-    INPUT(["🧬 UniProt accession\ne.g. P01308"])
+    INPUT(["🧬  UniProt accession\n  e.g. P01308  "])
 
     INPUT --> PRE
 
-    PRE{"🛡️ Biosafety pre-flight\nLayer 1 — UniProt ID blocklist"}
-    PRE -- "❌ Select Agent match" --> BLK1[/"🚫 HALTED\nno artifacts written"/]
+    PRE{"🛡️ Biosafety Pre-flight\n  Layer 1 · UniProt ID blocklist  "}
+    PRE -- "❌ Select Agent" --> BLK1[/"🚫 HALTED — no artifacts written"/]
     PRE -- "✅ Clear" --> SEQ
 
-    SEQ["🔍 Sequence retrieval\nUniProt REST · mature chain extraction"]
+    SEQ["🔍 Sequence Retrieval\n  UniProt REST · mature chain extraction  "]
     SEQ --> BIO
 
-    BIO{"🛡️ Biosafety screen\nLayer 2 — name keywords\nLayer 3 — AA signatures"}
-    BIO -- "❌ Blocked" --> BLK2[/"🚫 HALTED\nno artifacts written"/]
+    BIO{"🛡️ Biosafety Screen\n  Layer 2 · protein name keywords\n  Layer 3 · amino-acid signatures  "}
+    BIO -- "❌ Blocked" --> BLK2[/"🚫 HALTED — no artifacts written"/]
     BIO -- "✅ Clear" --> HOST
 
-    HOST["🧫 Host selection\nN-glyco · Cys count · GRAVY · length\n→ E. coli / CHO / P. pastoris / Sf9"]
+    HOST["🧫 Host Selection\n  N-glyco · Cys count · GRAVY · length\n  E. coli / CHO / P. pastoris / Sf9  "]
     HOST --> HC1
 
-    HC1{{"👤 Human checkpoint\nreview chains + host"}}
+    HC1{{"👤 Human Checkpoint\n  Review chains + host recommendation  "}}
     HC1 -- reject --> BLK3[/"🛑 Halted by user"/]
     HC1 -- approve --> FAN
 
-    FAN(["↔ Fan-out\none branch per chain"])
+    FAN(["  ↔  Fan-out — one branch per chain  "])
 
-    subgraph SUB["Per-chain subgraph  (parallel for each chain)"]
+    subgraph SUB["     Per-chain subgraph  ·  runs in parallel for each chain     "]
         direction TB
-        SOL["💧 Solubility prediction\nGRAVY · instability index · pI · Cys\n→ score 0–1 + disulfide risk flag"]
-        COD["⚙️ Codon optimisation\nbest E. coli codon per amino acid"]
-        CAS["🧱 Cassette assembly\nATG · 6×His · EK site · gene · TAATAA"]
-        PLA["🔬 Plasmid assembly\npET-28a(+) · BamHI/XhoI insert"]
-        VAL["✔️ Sequence validation\nGC · CAI · restriction sites\nRNA ΔG · back-translation · rare codons · repeats"]
-        REM["🔧 Remediation\nsynonymous codon swaps · retry"]
-        ESC["🤖 LLM escalation agent\napply_plan · change_strategy\nincompatible · give_up"]
-        CPASS(["✅ Chain passed"])
-        CFAIL(["❌ Chain failed"])
+        SOL["💧 Solubility Prediction\n  GRAVY · instability index · pI · Cys count\n  score 0–1 · disulfide risk flag  "]
+        COD["⚙️ Codon Optimisation\n  Best E. coli codon per amino acid  "]
+        CAS["🧱 Cassette Assembly\n  ATG · 6×His · EK site · gene · TAATAA  "]
+        PLA["🔬 Plasmid Assembly\n  pET-28a(+) · BamHI / XhoI insert  "]
+        VAL["✔️ Sequence Validation\n  GC · CAI · restriction sites · RNA ΔG\n  back-translation · rare codons · repeats  "]
+        REM["🔧 Remediation Agent\n  Synonymous codon swaps · retry  "]
+        ESC["🤖 LLM Escalation Agent\n  apply_plan · change_strategy\n  incompatible · give_up  "]
+        CPASS(["  ✅ Chain passed  "])
+        CFAIL(["  ❌ Chain failed  "])
 
         SOL --> COD --> CAS --> PLA --> VAL
         VAL -- "pass" --> CPASS
         VAL -- "fail · retries left" --> REM --> VAL
-        VAL -- "fail · retries exhausted" --> ESC
+        VAL -- "retries exhausted" --> ESC
         ESC -- "apply_plan" --> REM
         ESC -- "change_strategy" --> COD
         ESC -- "incompatible / give_up" --> CFAIL
@@ -98,32 +98,31 @@ flowchart TD
     CPASS --> MRG
     CFAIL --> MRG
 
-    MRG["⟨⟩ Merge results\naggregate validation + solubility + synthesis quotes"]
+    MRG["⟨⟩ Merge Results\n  Validation · solubility · synthesis quotes  "]
     MRG --> HC2
 
-    HC2{{"👤 Human checkpoint\nreview assembled plasmids"}}
+    HC2{{"👤 Human Checkpoint\n  Review assembled plasmids  "}}
     HC2 -- reject --> BLK4[/"🛑 Halted by user"/]
     HC2 -- approve --> STRUC
 
-    STRUC{"--structural flag?"}
-    STRUC -- yes --> ALP["🏗️ Structural validation\nESMFold/AlphaFold · pLDDT · RMSD"]
+    STRUC{"  --structural\n  flag?  "}
+    STRUC -- yes --> ALP["🏗️ Structural Validation\n  ESMFold / AlphaFold\n  pLDDT · RMSD to reference  "]
     STRUC -- no --> PROTO
     ALP --> PROTO
 
-    PROTO{"--protocol flag?"}
-    PROTO -- yes --> SOP["📚 Protocol generation\nPubMed search + LLM\nliterature-backed wet-lab SOP"]
+    PROTO{"  --protocol\n  flag?  "}
+    PROTO -- yes --> SOP["📚 Protocol Generation\n  PubMed literature search + LLM\n  literature-backed wet-lab SOP  "]
     PROTO -- no --> OUT
     SOP --> OUT
 
-    OUT[/"📦 Output artifacts\n*.fasta  ·  *_plasmid.gb  ·  *_peptides.tsv\nsynthesis_report.txt  ·  *_summary.json\nprotocol.md"/]
+    OUT[/"  📦 Output Artifacts\n  *.fasta  ·  *_plasmid.gb  ·  *_peptides.tsv\n  synthesis_report.txt  ·  *_summary.json  ·  protocol.md  "/]
 
-    classDef llm        fill:#f4a261,stroke:#e76f51,color:#1a1a2e
-    classDef det        fill:#457b9d,stroke:#1d3557,color:#f1faee
-    classDef block      fill:#e63946,stroke:#c1121f,color:#f1faee
-    classDef gate       fill:#2d6a4f,stroke:#1b4332,color:#d8f3dc
-    classDef human      fill:#9b72cf,stroke:#6a3d9a,color:#fff
-    classDef io         fill:#264653,stroke:#023047,color:#e9c46a
-    classDef merge      fill:#0077b6,stroke:#023e8a,color:#caf0f8
+    classDef det    fill:#dbeafe,stroke:#3b82f6,stroke-width:1.5px,color:#1e3a5f
+    classDef llm    fill:#fef3c7,stroke:#f59e0b,stroke-width:1.5px,color:#78350f
+    classDef block  fill:#fee2e2,stroke:#ef4444,stroke-width:1.5px,color:#7f1d1d
+    classDef gate   fill:#dcfce7,stroke:#22c55e,stroke-width:1.5px,color:#14532d
+    classDef human  fill:#ede9fe,stroke:#8b5cf6,stroke-width:1.5px,color:#3b0764
+    classDef io     fill:#f0fdf4,stroke:#86efac,stroke-width:1.5px,color:#14532d
 
     class SEQ,HOST,SOL,COD,CAS,PLA,VAL,REM,ALP,MRG det
     class ESC,SOP llm
