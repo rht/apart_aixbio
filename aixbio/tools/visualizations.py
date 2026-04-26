@@ -17,7 +17,7 @@ matplotlib.use("Agg")
 
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
-import matplotlib.ticker as mticker
+
 import matplotlib.gridspec as gridspec
 import numpy as np
 
@@ -361,65 +361,7 @@ def _panel_plasmid(ax: plt.Axes, summary: dict) -> None:
                 transform=ax.transAxes)
 
 
-# ── Panel E: Synthesis vendor comparison ─────────────────────────────
-
-def _panel_synthesis(ax: plt.Axes, summary: dict) -> None:
-    """Grouped bar chart with cost + feasibility + turnaround."""
-    synthesis = summary.get("synthesis_quotes", [])
-    if not synthesis:
-        ax.set_visible(False)
-        return
-
-    chains: list[str] = []
-    vendor_data: dict[str, list[dict]] = {}
-
-    for sq in synthesis:
-        chain_id = sq.get("chain_id", "?")
-        chains.append(chain_id)
-        for v in sq.get("vendors", []):
-            vname = v.get("vendor", "?")
-            vendor_data.setdefault(vname, []).append(v)
-
-    vendors = list(vendor_data.keys())
-    n_chains = len(chains)
-    n_vendors = len(vendors)
-    x = np.arange(n_chains)
-    width = 0.30
-
-    for i, vendor in enumerate(vendors):
-        recs = vendor_data[vendor]
-        costs = [r.get("estimated_cost_usd", 0) or 0 for r in recs]
-        feas = [r.get("feasible", False) for r in recs]
-        turnaround = [r.get("estimated_turnaround", "") for r in recs]
-        offset = (i - (n_vendors - 1) / 2) * width
-        color = _PALETTE[i % len(_PALETTE)]
-
-        bars = ax.bar(x + offset, costs, width * 0.85, label=vendor,
-                      color=color, edgecolor="white", linewidth=0.5, zorder=3)
-
-        for bar, cost, ok, ta in zip(bars, costs, feas, turnaround):
-            # Cost + feasibility label
-            status = "feasible" if ok else "infeasible"
-            ax.text(bar.get_x() + bar.get_width() / 2,
-                    bar.get_height() + 1,
-                    f"${cost:.0f}\n({status})",
-                    ha="center", va="bottom", fontsize=7,
-                    color=_GREEN if ok else _RED, fontweight="bold")
-
-    ax.set_xticks(x)
-    ax.set_xticklabels(chains, fontfamily="monospace", fontsize=8)
-    ax.set_ylabel("Estimated cost (USD)")
-    ax.yaxis.set_major_formatter(mticker.StrMethodFormatter("${x:,.0f}"))
-    ax.set_title("(e) Gene Synthesis Vendor Comparison", loc="left",
-                 fontweight="bold", pad=8)
-    ax.legend(fontsize=7)
-
-    # Add headroom for annotations
-    ymax = ax.get_ylim()[1]
-    ax.set_ylim(0, ymax * 1.25)
-
-
-# ── Panel F: Pipeline overview gauges ────────────────────────────────
+# ── Panel E: Pipeline overview gauges ────────────────────────────────
 
 def _panel_overview(ax: plt.Axes, summary: dict) -> None:
     """Normalised 0-100% gauge bars for key metrics.
@@ -503,13 +445,11 @@ def _panel_overview(ax: plt.Axes, summary: dict) -> None:
         ax.text(102, i, raw_s, va="center", ha="left", fontsize=8,
                 fontweight="bold", color=_BLACK)
 
-    ax.set_xlim(0, 115)  # give room for annotations
+    ax.set_xlim(0, 110)
     ax.set_yticks(y)
-    ax.set_yticklabels(labels, fontsize=9)
-    ax.set_xlabel("Normalised score (%)")
+    ax.set_yticklabels(labels, fontfamily="serif", fontsize=10)
     ax.invert_yaxis()
-    ax.set_title("(f) Key Quality Metrics", loc="left",
-                 fontweight="bold", pad=8)
+    ax.set_title("(e) Key Quality Metrics", loc="left", fontweight="bold", pad=12)
 
     handles = [
         mpatches.Patch(color=_LTGREY, label="Full range"),
@@ -524,14 +464,14 @@ def _panel_overview(ax: plt.Axes, summary: dict) -> None:
 def _build_combined_figure(summary: dict, out: Path) -> Path:
     """Create a single multi-panel figure combining all visualisations.
 
-    Layout (3 rows × 2 cols):
+    Layout (2 rows × 2 cols):
         Row 0:  (a) Validation checks     |  (b) Evo2 DNA quality
         Row 1:  (c) Cassette architecture  |  (d) Plasmid construct
-        Row 2:  (e) Synthesis costs        |  (f) Key metrics overview
+        Row 2:  (e) Key metrics overview   |  (Empty)
     """
     _apply_theme()
 
-    fig = plt.figure(figsize=(14, 16))
+    fig = plt.figure(figsize=(14, 12))
     gs = gridspec.GridSpec(3, 2, figure=fig, hspace=0.38, wspace=0.30)
 
     # (a) Validation checks
@@ -550,12 +490,8 @@ def _build_combined_figure(summary: dict, out: Path) -> Path:
     ax_plasm = fig.add_subplot(gs[1, 1])
     _panel_plasmid(ax_plasm, summary)
 
-    # (e) Synthesis
-    ax_synth = fig.add_subplot(gs[2, 0])
-    _panel_synthesis(ax_synth, summary)
-
-    # (f) Overview gauges
-    ax_over = fig.add_subplot(gs[2, 1])
+    # (e) Overview gauges
+    ax_over = fig.add_subplot(gs[2, 0])
     _panel_overview(ax_over, summary)
 
     # Suptitle
@@ -625,16 +561,6 @@ def _save_individual(summary: dict, out: Path) -> list[Path]:
         fig.tight_layout()
         safe = pm.get("chain_id", f"plasmid_{i}").replace(" ", "_").replace("/", "_")
         p = out / f"plasmid_{safe}.png"
-        fig.savefig(p, dpi=_DPI)
-        plt.close(fig)
-        paths.append(p)
-
-    # Synthesis
-    if summary.get("synthesis_quotes"):
-        fig, ax = plt.subplots(figsize=(max(5, 2.2), 4.5))
-        _panel_synthesis(ax, summary)
-        fig.tight_layout()
-        p = out / "synthesis_comparison.png"
         fig.savefig(p, dpi=_DPI)
         plt.close(fig)
         paths.append(p)

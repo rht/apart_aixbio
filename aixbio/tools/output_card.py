@@ -16,7 +16,6 @@ def generate_output_card(summary: dict, output_dir: str | Path) -> Path:
     host_rec = summary.get("host_recommendation", {})
     chains = summary.get("chains", [])
     warnings = summary.get("warnings", [])
-    synthesis = summary.get("synthesis_quotes", [])
     structure_chains = summary.get("structure_report", [])
     plasmids = summary.get("plasmids", [])
 
@@ -219,38 +218,6 @@ def generate_output_card(summary: dict, output_dir: str | Path) -> Path:
           {plasmid_cards}
         </div>"""
 
-    synthesis_html = ""
-    if synthesis:
-        vendor_rows = ""
-        for sq in synthesis:
-            sq_chain = html.escape(sq.get("chain_id", ""))
-            sq_len = sq.get("insert_length", "?")
-            sq_gc = sq.get("gc_content", 0)
-            for v in sq.get("vendors", []):
-                v_name = html.escape(v.get("vendor", ""))
-                v_ok = v.get("feasible", False)
-                v_color = "#16a34a" if v_ok else "#dc2626"
-                v_label = "FEASIBLE" if v_ok else "FLAGGED"
-                v_cost = f"~${v['estimated_cost_usd']:.0f}" if v.get("estimated_cost_usd") else "N/A"
-                v_eta = html.escape(v.get("estimated_turnaround") or "N/A")
-                notes = "; ".join(html.escape(n) for n in v.get("notes", []))
-                vendor_rows += f"""<tr>
-                  <td>{sq_chain}</td>
-                  <td>{v_name}</td>
-                  <td><span class="status-badge-sm" style="background:{v_color}">{v_label}</span></td>
-                  <td>{v_cost}</td>
-                  <td>{v_eta}</td>
-                  <td class="notes">{notes}</td>
-                </tr>"""
-
-        synthesis_html = f"""
-        <div class="section">
-          <h2>Synthesis Feasibility</h2>
-          <table class="synth-table">
-            <thead><tr><th>Chain</th><th>Vendor</th><th>Status</th><th>Est. Cost</th><th>Turnaround</th><th>Notes</th></tr></thead>
-            <tbody>{vendor_rows}</tbody>
-          </table>
-        </div>"""
 
     warnings_html = ""
     if warnings:
@@ -413,7 +380,6 @@ def generate_output_card(summary: dict, output_dir: str | Path) -> Path:
   {chains_html}
   {structure_html}
   {plasmid_html}
-  {synthesis_html}
   {warnings_html}
   {files_html}
 

@@ -19,13 +19,13 @@
         {
           "name": "gc_content",
           "passed": true,
-          "value": 0.5367,
+          "value": 0.5333,
           "threshold": "0.50-0.60"
         },
         {
           "name": "cai_score",
           "passed": true,
-          "value": 0.8784,
+          "value": 0.8787,
           "threshold": "> 0.8"
         },
         {
@@ -93,8 +93,8 @@
   "structure_report": [
     {
       "chain_id": "Insulin_P01308",
-      "log_prob": -342.13671875,
-      "mean_log_prob": -1.326111,
+      "log_prob": -341.5634765625,
+      "mean_log_prob": -1.323889,
       "sequence_length": 258,
       "method": "evo2"
     }
@@ -110,34 +110,6 @@
       "insert_size": 312,
       "backbone_size": 5369,
       "total_size": 5681
-    }
-  ],
-  "synthesis_quotes": [
-    {
-      "chain_id": "Insulin_P01308",
-      "insert_length": 312,
-      "gc_content": 0.542,
-      "longest_homopolymer": 4,
-      "vendors": [
-        {
-          "vendor": "IDT",
-          "feasible": true,
-          "estimated_cost_usd": 95.0,
-          "estimated_turnaround": "10\u201315 business days",
-          "rejection_flags": [],
-          "notes": [
-            "Expedited synthesis available (3\u20135 business days, additional cost)."
-          ]
-        },
-        {
-          "vendor": "Twist",
-          "feasible": true,
-          "estimated_cost_usd": 99.0,
-          "estimated_turnaround": "10\u201314 business days",
-          "rejection_flags": [],
-          "notes": []
-        }
-      ]
     }
   ]
 }
