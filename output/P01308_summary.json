@@ -1,0 +1,93 @@
+{
+  "compound_id": "P01308",
+  "status": "completed",
+  "warnings": [
+    "[host_selection] Denaturing lysis (urea/guanidinium) required.",
+    "[host_selection] Refolding yield is protein-dependent; optimise glutathione redox ratio.",
+    "[Insulin_P01308] 6 cysteine residues detected \u2014 disulfide bond formation requires oxidative refolding or periplasmic expression."
+  ],
+  "chains": [
+    {
+      "chain_id": "Insulin_P01308",
+      "insert_size": 312,
+      "validation_passed": true,
+      "remediation_rounds": 1,
+      "status": "passed",
+      "solubility_score": 0.594,
+      "disulfide_risk": true,
+      "checks": [
+        {
+          "name": "gc_content",
+          "passed": true,
+          "value": 0.5367,
+          "threshold": "0.50-0.60"
+        },
+        {
+          "name": "cai_score",
+          "passed": true,
+          "value": 0.8784,
+          "threshold": "> 0.8"
+        },
+        {
+          "name": "restriction_sites",
+          "passed": true,
+          "value": "none",
+          "threshold": "0 hits"
+        },
+        {
+          "name": "rna_secondary_structure",
+          "passed": true,
+          "value": -0.7,
+          "threshold": "> -10 kcal/mol"
+        },
+        {
+          "name": "back_translation",
+          "passed": true,
+          "value": "match",
+          "threshold": "100% identity"
+        },
+        {
+          "name": "rare_codons",
+          "passed": true,
+          "value": 0,
+          "threshold": "0"
+        },
+        {
+          "name": "direct_repeats",
+          "passed": true,
+          "value": "none",
+          "threshold": "0 repeats >= 20 bp"
+        }
+      ]
+    }
+  ],
+  "protein": {
+    "name": "Insulin",
+    "uniprot_id": "P01308",
+    "chains": [
+      {
+        "id": "Insulin_P01308",
+        "length": 86
+      }
+    ]
+  },
+  "host_recommendation": {
+    "primary_host": "Escherichia coli",
+    "confidence": "medium",
+    "reasoning": "Short protein (86 aa) with 6 cysteines. E. coli expression as inclusion bodies followed by oxidative refolding is the established route (e.g. recombinant insulin).",
+    "alternative_hosts": [
+      "Pichia pastoris"
+    ],
+    "caveats": [
+      "Denaturing lysis (urea/guanidinium) required.",
+      "Refolding yield is protein-dependent; optimise glutathione redox ratio."
+    ],
+    "features": {
+      "total_chain_length": 86,
+      "n_glycosylation_sites": 0,
+      "total_cysteine_count": 6,
+      "disulfide_risk": true,
+      "max_gravy": -0.102
+    }
+  }
+}

@@ -2,7 +2,7 @@
 
 |  AIXBio: A LangGraph Agent Tool Suite for Biological Engineering Workflows[^1]  |
 | ----- |
-|   Andre van Dam **With** Apart Research  **Abstract** Biological engineering workflows — from protein sequence retrieval to expression-ready plasmid design — involve multi-step processes that demand specialized knowledge and are difficult to automate safely. We propose that LangGraph-based agent tool suites offer a promising architecture for assisting researchers with such workflows, and present AIXBio as a proof of concept. AIXBio is a two-level state graph that takes a UniProt protein accession and walks a researcher through codon optimization, expression cassette assembly, plasmid construction, and multi-point sequence validation — all orchestrated as composable graph nodes with typed state, human-in-the-loop checkpoints, and a full audit trail. The core pipeline is deterministic: an LLM is only invoked as a bounded escalation agent when rule-based remediation fails, and human review gates ensure the researcher remains in control. We demonstrate the concept on insulin (P01308) and discuss the architectural properties — composability, auditability, bounded AI agency, and testability — that make LangGraph well-suited for safety-critical biological tool suites. AIXBio is not a production system; it is a proof of concept intended to explore how agent frameworks can structure and govern multi-step bio workflows while keeping the researcher in the loop.  |
+|   Drew **With** Apart Research  **Abstract** Biological engineering workflows — from protein sequence retrieval to expression-ready plasmid design — involve multi-step processes that demand specialized knowledge and are difficult to automate safely. We propose that LangGraph-based agent tool suites offer a promising architecture for assisting researchers with such workflows, and present AIXBio as a proof of concept. AIXBio is a two-level state graph that takes a UniProt protein accession and walks a researcher through codon optimization, expression cassette assembly, plasmid construction, and multi-point sequence validation — all orchestrated as composable graph nodes with typed state, human-in-the-loop checkpoints, and a full audit trail. The core pipeline is deterministic: an LLM is only invoked as a bounded escalation agent when rule-based remediation fails, and human review gates ensure the researcher remains in control. We demonstrate the concept on insulin (P01308) and discuss the architectural properties — composability, auditability, bounded AI agency, and testability — that make LangGraph well-suited for safety-critical biological tool suites. AIXBio is not a production system; it is a proof of concept intended to explore how agent frameworks can structure and govern multi-step bio workflows while keeping the researcher in the loop.  |
 
 ## **1\. Introduction**
 
@@ -288,7 +288,25 @@ Main Graph
 └── structural_validation        Optional ESMFold/AlphaFold check
 ```
 
-### B. LangGraph Features Used
+### B. Extension Patterns
+
+**Adding a validation check** — touches 1–2 files, no structural changes:
+```
+tools/my_check.py          Write pure function: dna -> score
+nodes/sequence_validation   Import function, append CheckResult to checks list
+nodes/remediation_agent     (Optional) Add elif branch for the new check name
+```
+
+**Adding a pipeline step** — touches 5 files across 5 layers:
+```
+models/my_model.py          Define frozen dataclass for the step's output
+state/chain_state.py        Add field to ChainSubgraphState TypedDict
+tools/my_tool.py            Write pure function for the computation
+nodes/my_node.py            Write node: read state -> call tool -> return partial dict
+graph/chain_subgraph.py     add_node() + add_edge() at the desired position
+```
+
+### C. LangGraph Features Used
 
 | Feature | Use in AIXBio | Relevance to Bio Workflows |
 |---------|---------------|---------------------------|

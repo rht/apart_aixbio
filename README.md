@@ -16,11 +16,12 @@ uv sync
 echo "OPENROUTER_API_KEY=sk-..." > .env
 
 # Run — insulin as an example
-uv run aixbio P01308                   # interactive (human review prompts)
-uv run aixbio P01308 --auto-approve    # fully automated
-uv run aixbio P01308 --escalation      # enable LLM fallback on hard failures
-uv run aixbio P01308 --structural      # add ESMFold/AlphaFold structure check
-uv run aixbio P01308 --protocol        # generate literature-backed wet-lab SOP
+uv run python -m aixbio P01308                   # interactive (human review prompts)
+uv run python -m aixbio P01308 --auto-approve    # fully automated
+uv run python -m aixbio P01308 --escalation      # enable LLM fallback on hard failures
+uv run python -m aixbio P01308 --structural      # add ESMFold/AlphaFold structure check
+uv run python -m aixbio P01308 --protocol        # generate literature-backed wet-lab SOP
+uv run python -m aixbio P01308 --auto-approve --structural --protocol --escalation
 ```
 
 ## Pipeline overview
