@@ -19,13 +19,13 @@
         {
           "name": "gc_content",
           "passed": true,
-          "value": 0.5367,
+          "value": 0.5333,
           "threshold": "0.50-0.60"
         },
         {
           "name": "cai_score",
           "passed": true,
-          "value": 0.8784,
+          "value": 0.8721,
           "threshold": "> 0.8"
         },
         {

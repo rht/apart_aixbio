@@ -3,7 +3,7 @@ Synthesis Feasibility Report
 
 Chain: Insulin_P01308
   Insert length : 312 bp
-  GC content    : 54.2%
+  GC content    : 53.8%
   Max homopolymer: 4 bp
 
   IDT     [FEASIBLE]  ~$95  10–15 business days
